@@ -1,4 +1,4 @@
-package cherryriver
+package cherrysprings
 
 import chipsalliance.rocketchip.config.Parameters
 import chisel3.stage.ChiselStage

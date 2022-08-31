@@ -42,6 +42,6 @@ lazy val rocketchip = (Project("rocket-chip", file("rocket-chip/src")))
   .dependsOn(hardfloat)
   .dependsOn(rocketMacros)
 
-lazy val cherryriver = (project in file("."))
+lazy val cherrysprings = (project in file("."))
   .settings(commonSettings, chiselSettings)
   .dependsOn(rocketchip)
