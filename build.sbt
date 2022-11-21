@@ -1,4 +1,4 @@
-val chiselVersion = "3.5.4"
+val chiselVersion = "3.5.5"
 scalaVersion := "2.12.16"
 
 lazy val commonSettings = Seq(
@@ -10,15 +10,15 @@ lazy val commonSettings = Seq(
     "-Xsource:2.11"
   ),
   libraryDependencies ++= Seq("org.scala-lang" % "scala-reflect" % scalaVersion.value),
-  libraryDependencies ++= Seq("org.json4s" %% "json4s-jackson" % "3.6.12"),
-  libraryDependencies ++= Seq("org.scalatest" %% "scalatest" % "3.2.12" % "test"),
+  libraryDependencies ++= Seq("org.json4s" %% "json4s-jackson" % "4.0.6"),
+  libraryDependencies ++= Seq("org.scalatest" %% "scalatest" % "3.2.14" % "test"),
   addCompilerPlugin(("org.scalamacros" % "paradise" % "2.1.1").cross(CrossVersion.full))
 )
 
 lazy val chiselSettings = Seq(
   libraryDependencies ++= Seq(
     "edu.berkeley.cs" %% "chisel3" % chiselVersion,
-    "edu.berkeley.cs" %% "chiseltest" % "0.5.4"
+    "edu.berkeley.cs" %% "chiseltest" % "0.5.5"
   ),
   addCompilerPlugin(("edu.berkeley.cs" % "chisel3-plugin" % chiselVersion).cross(CrossVersion.full))
 )
@@ -42,6 +42,10 @@ lazy val rocketchip = (Project("rocket-chip", file("rocket-chip/src")))
   .dependsOn(hardfloat)
   .dependsOn(rocketMacros)
 
-lazy val cherrysprings = (project in file("."))
+lazy val difftest = (project in file("difftest"))
+  .settings(commonSettings, chiselSettings)
+
+lazy val cherrysprings = project.in(file("."))
   .settings(commonSettings, chiselSettings)
   .dependsOn(rocketchip)
+  .dependsOn(difftest)

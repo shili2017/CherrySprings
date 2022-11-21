@@ -344,3 +344,7 @@ hs_err_pid*
 .metals/
 .bloop/
 project/
+
+# DRAMsim3
+dramsim3.json
+dramsim3.txt

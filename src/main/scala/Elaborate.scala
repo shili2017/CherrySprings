@@ -1,11 +1,10 @@
-package cherrysprings
+import chipsalliance.rocketchip.config._
+import freechips.rocketchip.diplomacy.LazyModule
+import freechips.rocketchip.util.HasRocketChipStageUtils
 
-import chipsalliance.rocketchip.config.Parameters
-import chisel3.stage.ChiselStage
-import freechips.rocketchip.diplomacy._
-
-object Elaborate extends App {
-  (new ChiselStage).execute(args, Seq(chisel3.stage.ChiselGeneratorAnnotation(
-    () => LazyModule(new AdderTestHarness()(Parameters.empty)).module))
-  )
+object Elaborate extends App with HasRocketChipStageUtils {
+  implicit val p: Config = new CherrySpringsConfig
+  val top     = LazyModule(new SimTop())
+  val verilog = chisel3.stage.ChiselStage.emitVerilog(top.module)
+  writeOutputFile("build", "SimTop.v", verilog)
 }
