@@ -51,13 +51,13 @@ object RegMap {
   def apply(addr: UInt, reg: UInt, wfn: UInt => UInt = (x => x)) = (addr, (reg, wfn))
 
   def access(
-              mapping: Map[UInt, (UInt, UInt => UInt)],
-              addr:    UInt,
-              rdata:   UInt,
-              wdata:   UInt,
-              wmask:   UInt,
-              wen:     Bool
-            ): Unit = {
+    mapping: Map[UInt, (UInt, UInt => UInt)],
+    addr:    UInt,
+    rdata:   UInt,
+    wdata:   UInt,
+    wmask:   UInt,
+    wen:     Bool
+  ): Unit = {
     mapping.map {
       case (a, (r, wfn)) => {
         when(addr === a) {
@@ -87,12 +87,12 @@ object MaskedRegMap {
     (addr, (reg, wmask, wfn, rmask))
 
   def access(
-              mapping: Map[UInt, (UInt, UInt, UInt => UInt, UInt)],
-              addr:    UInt,
-              rdata:   UInt,
-              wdata:   UInt,
-              wen:     Bool
-            ): Unit = {
+    mapping: Map[UInt, (UInt, UInt, UInt => UInt, UInt)],
+    addr:    UInt,
+    rdata:   UInt,
+    wdata:   UInt,
+    wen:     Bool
+  ): Unit = {
     mapping.map {
       case (a, (r, wm, wfn, rm)) => {
         when(addr === a) {

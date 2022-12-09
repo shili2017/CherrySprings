@@ -22,20 +22,20 @@ class SimTop(implicit p: Parameters) extends LazyModule {
 
   lazy val module = new LazyModuleImp(this) {
     val io = IO(new Bundle {
-      val logCtrl               = new LogCtrlIO
-      val perfInfo              = new PerfInfoIO
-      val uart                  = new UARTIO
-      val memAXI_0              = new AXI4IO
+      val logCtrl  = new LogCtrlIO
+      val perfInfo = new PerfInfoIO
+      val uart     = new UARTIO
+      val memAXI_0 = new AXI4IO
     })
 
     val core = Module(new Core)
 
     bridge_imem.module.io.cache <> core.io.imem
     bridge_dmem.module.io.cache <> core.io.dmem
-    io.memAXI_0                 <> mem.module.io.memAXI_0
+    io.memAXI_0                 <> mem.module.io.axi4
 
-    io.uart.out.valid        := false.B
-    io.uart.out.ch           := 0.U
-    io.uart.in.valid         := false.B
+    io.uart.out.valid := false.B
+    io.uart.out.ch    := 0.U
+    io.uart.in.valid  := false.B
   }
 }

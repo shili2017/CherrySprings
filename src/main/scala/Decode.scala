@@ -10,9 +10,8 @@ class Decode extends Module {
   val instr = io.in.instr
   val uop   = WireInit(0.U.asTypeOf(new MicroOp))
 
-  uop.pc    := io.in.pc
-  uop.instr := instr
-
+  uop.pc        := io.in.pc
+  uop.instr     := instr
   uop.rs1_index := instr(19, 15)
   uop.rs2_index := instr(24, 20)
   uop.rd_index  := instr(11, 7)

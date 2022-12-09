@@ -3,6 +3,10 @@ import chisel3.util.experimental.decode._
 import Constant._
 import freechips.rocketchip.rocket.Instructions._
 
+object HALT {
+  def apply() = BitPat("b00000000000000000000000001101011")
+}
+
 object DecodeTable {
   val decode_default: String = Seq(
     //             v  i  fu      alu_op jmp_op    mdu_op lsu_op   lsu_len csr_op sys_op rs1/2_src rd_wen imm_type
@@ -63,6 +67,8 @@ object DecodeTable {
     DIV     -> Seq(Y, N, FU_MDU, ALU_X,    JMP_NONE, MDU_DIV,    LSU_NONE, LSU_X,     CSR_X,     SYS_X,      RS_RF,   RS_RF,  Y, IMM_X),
     DIVU    -> Seq(Y, N, FU_MDU, ALU_X,    JMP_NONE, MDU_DIVU,   LSU_NONE, LSU_X,     CSR_X,     SYS_X,      RS_RF,   RS_RF,  Y, IMM_X),
     REM     -> Seq(Y, N, FU_MDU, ALU_X,    JMP_NONE, MDU_REM,    LSU_NONE, LSU_X,     CSR_X,     SYS_X,      RS_RF,   RS_RF,  Y, IMM_X),
-    REMU    -> Seq(Y, N, FU_MDU, ALU_X,    JMP_NONE, MDU_REMU,   LSU_NONE, LSU_X,     CSR_X,     SYS_X,      RS_RF,   RS_RF,  Y, IMM_X)
+    REMU    -> Seq(Y, N, FU_MDU, ALU_X,    JMP_NONE, MDU_REMU,   LSU_NONE, LSU_X,     CSR_X,     SYS_X,      RS_RF,   RS_RF,  Y, IMM_X),
+    // HALT
+    HALT()  -> Seq(Y, N, FU_ALU, ALU_ADD,  JMP_NONE, MDU_X,      LSU_NONE, LSU_X,     CSR_X,     SYS_X,      RS_RF,   RS_RF,  Y, IMM_X)
   ).map({ case (k, v) => k -> BitPat(s"b${v.reduce(_ + _)}") }), BitPat(s"b$decode_default"))
 }

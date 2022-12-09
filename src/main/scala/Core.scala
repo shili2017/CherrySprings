@@ -1,7 +1,8 @@
 import chisel3._
+import chisel3.util._
+import chisel3.util.experimental.BoringUtils
 import chipsalliance.rocketchip.config._
 import Constant._
-import chisel3.util.experimental.BoringUtils
 import difftest._
 
 class Core(implicit p: Parameters) extends Module {
@@ -13,7 +14,7 @@ class Core(implicit p: Parameters) extends Module {
   val stall_b = WireInit(false.B)
   val flush   = WireInit(false.B)
 
-  /* ----- Stage 1 - Instruction Fetch 1 (IF1) ----- */
+  /* ----- Stage 1 - Instruction Fetch (IF) -------- */
 
   val ifu        = Module(new IFU)
   val jmp_packet = Wire(new JmpPacket)
@@ -41,44 +42,73 @@ class Core(implicit p: Parameters) extends Module {
   id_ex.io.in.uop      := decode.io.out
   id_ex.io.in.rs1_data := id_rs1_data
   id_ex.io.in.rs2_data := id_rs2_data
+  id_ex.io.in.st_data  := rf.io.rs2_data
   id_ex.io.en          := stall_b
   id_ex.io.flush       := flush
 
   /* ----- Stage 3 - Execution (EX) ---------------- */
 
   val alu = Module(new ALU)
-  alu.io.uop        := id_ex.io.out.uop
-  alu.io.in1        := id_ex.io.out.rs1_data
-  alu.io.in2        := id_ex.io.out.rs2_data
-  jmp_packet.valid  := alu.io.uop.fu === s"b$FU_JMP".U && alu.io.cmp_out
-  jmp_packet.target := alu.io.adder_out
+  alu.io.uop := id_ex.io.out.uop
+  alu.io.in1 := id_ex.io.out.rs1_data
+  alu.io.in2 := id_ex.io.out.rs2_data
+
+  jmp_packet.valid := MuxLookup(
+    alu.io.uop.jmp_op,
+    false.B,
+    Array(
+      s"b$JMP_BR".U   -> alu.io.cmp_out,
+      s"b$JMP_JAL".U  -> true.B,
+      s"b$JMP_JALR".U -> true.B
+    )
+  )
+  jmp_packet.target := Mux(
+    alu.io.uop.jmp_op === s"b$JMP_BR".U,
+    id_ex.io.out.uop.pc + id_ex.io.out.uop.imm,
+    alu.io.adder_out
+  )
 
   val ex_mem = Module(new PipelineReg(new XMPacket))
   ex_mem.io.in.uop      := id_ex.io.out.uop
-  ex_mem.io.in.rs2_data := id_ex.io.out.rs2_data
-  ex_mem.io.in.rd_data  := alu.io.out
-  ex_mem.io.en          := stall_b
-  ex_mem.io.flush       := flush
+  ex_mem.io.in.rs1_data := id_ex.io.out.rs1_data
+  ex_mem.io.in.st_data  := id_ex.io.out.st_data
+  ex_mem.io.in.rd_data := Mux(
+    id_ex.io.out.uop.jmp_op === s"b$JMP_JAL".U || id_ex.io.out.uop.jmp_op === s"b$JMP_JALR".U,
+    id_ex.io.out.uop.pc + 4.U,
+    alu.io.out
+  )
+  ex_mem.io.en    := stall_b
+  ex_mem.io.flush := false.B
 
   /* ----- Stage 4 - Memory (MEM) ------------------ */
 
-  val lsu = Module(new LSU)
-  lsu.io.uop   := ex_mem.io.out.uop
-  lsu.io.addr  := ex_mem.io.out.rd_data
-  lsu.io.wdata := ex_mem.io.out.rs2_data
-  lsu.io.dmem  <> io.dmem
+  val is_mem = ex_mem.io.out.uop.fu === s"b$FU_LSU".U
+  val is_mdu = ex_mem.io.out.uop.fu === s"b$FU_MDU".U
 
-  val is_load = ex_mem.io.out.uop.lsu_op === s"b$LSU_LD".U || ex_mem.io.out.uop.lsu_op === s"b$LSU_LDU".U
-  val mem_wb  = Module(new PipelineReg(new MWPacket))
-  mem_wb.io.in.uop     := id_ex.io.out.uop
-  mem_wb.io.in.rd_data := Mux(is_load, lsu.io.rdata, ex_mem.io.out.rd_data)
-  mem_wb.io.en         := lsu.io.ready
-  mem_wb.io.flush      := false.B
+  val lsu = Module(new LSU)
+  lsu.io.uop    := ex_mem.io.out.uop
+  lsu.io.is_mem := is_mem
+  lsu.io.addr   := ex_mem.io.out.rd_data
+  lsu.io.wdata  := ex_mem.io.out.st_data
+  lsu.io.dmem   <> io.dmem
+
+  val mdu = Module(new MDU)
+  mdu.io.uop    := ex_mem.io.out.uop
+  mdu.io.is_mdu := is_mdu
+  mdu.io.in1    := ex_mem.io.out.rs1_data
+  mdu.io.in2    := ex_mem.io.out.st_data
+
+  val mem_wb = Module(new PipelineReg(new MWPacket))
+  mem_wb.io.in.uop       := ex_mem.io.out.uop
+  mem_wb.io.in.uop.valid := Mux(is_mem, lsu.io.valid, Mux(is_mdu, mdu.io.valid, ex_mem.io.out.uop.valid))
+  mem_wb.io.in.rd_data   := Mux(is_mem, lsu.io.rdata, Mux(is_mdu, mdu.io.out, ex_mem.io.out.rd_data))
+  mem_wb.io.en           := lsu.io.ready && mdu.io.ready
+  mem_wb.io.flush        := false.B
 
   /* ----- Stage 5 - Write Back (WB) --------------- */
 
   val commit_uop = mem_wb.io.out.uop
-  rf.io.rd_wen   := commit_uop.rd_wen
+  rf.io.rd_wen   := commit_uop.valid && commit_uop.rd_wen
   rf.io.rd_index := commit_uop.rd_index
   rf.io.rd_data  := mem_wb.io.out.rd_data
 
@@ -100,7 +130,15 @@ class Core(implicit p: Parameters) extends Module {
   ) {
     id_rs1_data := mem_wb.io.in.rd_data
   }.otherwise {
-    id_rs1_data := rf.io.rs1_data
+    id_rs1_data := MuxLookup(
+      decode.io.out.rs1_src,
+      0.U,
+      Array(
+        s"b$RS_PC".U  -> if_id.io.out.pc,
+        s"b$RS_RF".U  -> rf.io.rs1_data,
+        s"b$RS_IMM".U -> decode.io.out.imm
+      )
+    )
   }
 
   when(
@@ -116,12 +154,20 @@ class Core(implicit p: Parameters) extends Module {
   ) {
     id_rs2_data := mem_wb.io.in.rd_data
   }.otherwise {
-    id_rs2_data := rf.io.rs2_data
+    id_rs2_data := MuxLookup(
+      decode.io.out.rs2_src,
+      0.U,
+      Array(
+        s"b$RS_PC".U  -> if_id.io.out.pc,
+        s"b$RS_RF".U  -> rf.io.rs2_data,
+        s"b$RS_IMM".U -> decode.io.out.imm
+      )
+    )
   }
 
   /* ----- Pipeline Control Signals -------------- */
 
-  stall_b := lsu.io.ready
+  stall_b := lsu.io.ready && mdu.io.ready
   flush   := jmp_packet.valid
 
   /* ----- Performance Counters ------------------ */
@@ -144,9 +190,20 @@ class Core(implicit p: Parameters) extends Module {
     diff_ic.io.skip    := false.B
     diff_ic.io.isRVC   := false.B
     diff_ic.io.rfwen   := commit_uop.rd_wen
-    diff_ic.io.fpwen   := false.B
     diff_ic.io.wpdest  := commit_uop.rd_index
     diff_ic.io.wdest   := commit_uop.rd_index
+    if (p(Debug)) {
+      when(commit_uop.valid) {
+        printf(
+          "%d [COMMIT] pc=%x instr=%x wen=%x wdest=%d\n",
+          DebugTimer(),
+          commit_uop.pc,
+          commit_uop.instr,
+          commit_uop.rd_wen,
+          commit_uop.rd_index
+        )
+      }
+    }
 
     val trap  = (commit_uop.instr === "h0000006b".U) && commit_uop.valid
     val rf_a0 = WireInit(0.U(64.W))

@@ -6,5 +6,5 @@ object Elaborate extends App with HasRocketChipStageUtils {
   implicit val p: Config = new CherrySpringsConfig
   val top     = LazyModule(new SimTop())
   val verilog = chisel3.stage.ChiselStage.emitVerilog(top.module)
-  writeOutputFile("build", "SimTop.v", verilog)
+  writeOutputFile(".", "SimTop.v", verilog)
 }

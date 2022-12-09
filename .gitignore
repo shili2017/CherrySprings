@@ -347,4 +347,9 @@ project/
 
 # DRAMsim3
 dramsim3.json
+dramsim3epoch.json
 dramsim3.txt
+
+# Build
+*.v
+*.f

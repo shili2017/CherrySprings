@@ -12,17 +12,17 @@ class ALU extends Module {
     val cmp_out   = Output(Bool())
   })
 
-  val is_sub  = io.uop.alu_op(3)
-  val in2_inv = Mux(is_sub, (~io.in2).asUInt, io.in2)
-  val xor     = io.in1 ^ in2_inv
-  io.adder_out := io.in1 + in2_inv + is_sub
-
+  val is_sub       = io.uop.alu_op(3)
+  val in2_inv      = Mux(is_sub, (~io.in2).asUInt, io.in2)
+  val xor          = io.in1 ^ in2_inv
   val cmp_unsigned = io.uop.alu_op(1)
   val cmp_inverted = io.uop.alu_op(0)
   val cmp_eq       = !io.uop.alu_op(3)
   val lt           = Wire(Bool())
-  lt         := Mux(io.in1(31) === io.in2(31), io.adder_out(31), Mux(cmp_unsigned, io.in2(31), io.in1(31)))
-  io.cmp_out := cmp_inverted ^ Mux(cmp_eq, xor === 0.U, lt)
+
+  lt           := Mux(io.in1(31) === io.in2(31), io.adder_out(31), Mux(cmp_unsigned, io.in2(31), io.in1(31)))
+  io.adder_out := io.in1 + in2_inv + is_sub
+  io.cmp_out   := cmp_inverted ^ Mux(cmp_eq, xor === 0.U, lt)
 
   val shamt = Wire(UInt(5.W))
   shamt := io.in2(4, 0).asUInt

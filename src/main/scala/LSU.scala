@@ -4,25 +4,26 @@ import Constant._
 
 class LSU extends Module {
   val io = IO(new Bundle {
-    val uop   = Input(new MicroOp)
-    val addr  = Input(UInt(32.W))
-    val wdata = Input(UInt(32.W))
-    val rdata = Output(UInt(32.W))
-    val dmem  = new CachePortIO
-    val ready = Output(Bool())
+    val uop    = Input(new MicroOp)
+    val is_mem = Input(Bool())
+    val addr   = Input(UInt(32.W))
+    val wdata  = Input(UInt(32.W))
+    val rdata  = Output(UInt(32.W))
+    val valid  = Output(Bool())
+    val dmem   = new CachePortIO
+    val ready  = Output(Bool())
   })
 
-  val uop   = io.uop
-  val addr  = io.addr
-  val wdata = io.wdata
-  val req   = io.dmem.req
-  val resp  = io.dmem.resp
-
-  val is_mem   = uop.fu === s"b$FU_LSU".U
+  val uop      = io.uop
+  val addr     = io.addr
+  val wdata    = io.wdata
+  val req      = io.dmem.req
+  val resp     = io.dmem.resp
+  val is_mem   = io.is_mem
   val is_store = uop.lsu_op === s"b$LSU_ST".U
 
-  val s_idle :: s_wait :: Nil = Enum(2)
-  val state                   = RegInit(s_idle)
+  val s_idle :: s_req :: s_resp :: Nil = Enum(3)
+  val state                            = RegInit(s_idle)
 
   val addr_offset = addr(1, 0)
   val wmask = MuxLookup(
@@ -39,8 +40,8 @@ class LSU extends Module {
   req.bits.wdata := (wdata << (addr_offset << 3))(31, 0)
   req.bits.wmask := (wmask << addr_offset)(3, 0)
   req.bits.wen   := is_store
-  req.valid      := (state === s_idle) && uop.valid && is_mem
-  resp.ready     := (state === s_wait)
+  req.valid      := (state === s_req) && uop.valid && is_mem
+  resp.ready     := (state === s_resp)
 
   val resp_data = resp.bits.rdata >> (addr_offset << 3)
   val ld_out    = Wire(UInt(64.W))
@@ -48,11 +49,16 @@ class LSU extends Module {
 
   switch(state) {
     is(s_idle) {
-      when(req.fire) {
-        state := s_wait
+      when(is_mem) {
+        state := s_req
       }
     }
-    is(s_wait) {
+    is(s_req) {
+      when(req.fire) {
+        state := s_resp
+      }
+    }
+    is(s_resp) {
       when(resp.fire) {
         state := s_idle
       }
@@ -87,6 +93,6 @@ class LSU extends Module {
       s"b$LSU_LDU".U -> ldu_out
     )
   )
-
-  io.ready := req.ready && (state === s_idle)
+  io.valid := (state === s_resp) && resp.fire // assert for only 1 cycle
+  io.ready := ((state === s_idle) && !is_mem) || io.valid
 }

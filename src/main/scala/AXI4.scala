@@ -54,5 +54,4 @@ class AXI4IO extends Bundle with AXI4Parameters {
   val ruser  = Input(UInt(AXI4UserWidth.W))
   val rvalid = Input(Bool())
   val rready = Output(Bool())
-
 }
