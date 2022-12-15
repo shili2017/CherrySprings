@@ -31,23 +31,23 @@ class LSU(implicit p: Parameters) extends CherrySpringsModule {
   val addr_offset = if (xLen == 32) addr(1, 0) else addr(2, 0)
   val wmask = if (xLen == 32) {
     MuxLookup(
-      uop.lsu_len,
+      uop.mem_len,
       0.U,
       Array(
-        s"b$LSU_BYTE".U -> "b0001".U(4.W),
-        s"b$LSU_HALF".U -> "b0011".U(4.W),
-        s"b$LSU_WORD".U -> "b1111".U(4.W)
+        s"b$MEM_BYTE".U -> "b0001".U(4.W),
+        s"b$MEM_HALF".U -> "b0011".U(4.W),
+        s"b$MEM_WORD".U -> "b1111".U(4.W)
       )
     )
   } else {
     MuxLookup(
-      uop.lsu_len,
+      uop.mem_len,
       0.U,
       Array(
-        s"b$LSU_BYTE".U  -> "b00000001".U(8.W),
-        s"b$LSU_HALF".U  -> "b00000011".U(8.W),
-        s"b$LSU_WORD".U  -> "b00001111".U(8.W),
-        s"b$LSU_DWORD".U -> "b11111111".U(8.W)
+        s"b$MEM_BYTE".U  -> "b00000001".U(8.W),
+        s"b$MEM_HALF".U  -> "b00000011".U(8.W),
+        s"b$MEM_WORD".U  -> "b00001111".U(8.W),
+        s"b$MEM_DWORD".U -> "b11111111".U(8.W)
       )
     )
   }
@@ -83,42 +83,42 @@ class LSU(implicit p: Parameters) extends CherrySpringsModule {
 
   if (xLen == 32) {
     ld_out := MuxLookup(
-      uop.lsu_len,
+      uop.mem_len,
       0.U,
       Array(
-        s"b$LSU_BYTE".U -> Cat(Fill(24, resp_data(7)), resp_data(7, 0)),
-        s"b$LSU_HALF".U -> Cat(Fill(16, resp_data(15)), resp_data(15, 0)),
-        s"b$LSU_WORD".U -> resp_data
+        s"b$MEM_BYTE".U -> Cat(Fill(24, resp_data(7)), resp_data(7, 0)),
+        s"b$MEM_HALF".U -> Cat(Fill(16, resp_data(15)), resp_data(15, 0)),
+        s"b$MEM_WORD".U -> resp_data
       )
     )
 
     ldu_out := MuxLookup(
-      uop.lsu_len,
+      uop.mem_len,
       0.U,
       Array(
-        s"b$LSU_BYTE".U -> Cat(Fill(24, 0.U), resp_data(7, 0)),
-        s"b$LSU_HALF".U -> Cat(Fill(16, 0.U), resp_data(15, 0))
+        s"b$MEM_BYTE".U -> Cat(Fill(24, 0.U), resp_data(7, 0)),
+        s"b$MEM_HALF".U -> Cat(Fill(16, 0.U), resp_data(15, 0))
       )
     )
   } else {
     ld_out := MuxLookup(
-      uop.lsu_len,
+      uop.mem_len,
       0.U,
       Array(
-        s"b$LSU_BYTE".U  -> Cat(Fill(56, resp_data(7)), resp_data(7, 0)),
-        s"b$LSU_HALF".U  -> Cat(Fill(48, resp_data(15)), resp_data(15, 0)),
-        s"b$LSU_WORD".U  -> Cat(Fill(32, resp_data(31)), resp_data(31, 0)),
-        s"b$LSU_DWORD".U -> resp_data
+        s"b$MEM_BYTE".U  -> Cat(Fill(56, resp_data(7)), resp_data(7, 0)),
+        s"b$MEM_HALF".U  -> Cat(Fill(48, resp_data(15)), resp_data(15, 0)),
+        s"b$MEM_WORD".U  -> Cat(Fill(32, resp_data(31)), resp_data(31, 0)),
+        s"b$MEM_DWORD".U -> resp_data
       )
     )
 
     ldu_out := MuxLookup(
-      uop.lsu_len,
+      uop.mem_len,
       0.U,
       Array(
-        s"b$LSU_BYTE".U -> Cat(Fill(56, 0.U), resp_data(7, 0)),
-        s"b$LSU_HALF".U -> Cat(Fill(48, 0.U), resp_data(15, 0)),
-        s"b$LSU_WORD".U -> Cat(Fill(32, 0.U), resp_data(31, 0))
+        s"b$MEM_BYTE".U -> Cat(Fill(56, 0.U), resp_data(7, 0)),
+        s"b$MEM_HALF".U -> Cat(Fill(48, 0.U), resp_data(15, 0)),
+        s"b$MEM_WORD".U -> Cat(Fill(32, 0.U), resp_data(31, 0))
       )
     )
   }

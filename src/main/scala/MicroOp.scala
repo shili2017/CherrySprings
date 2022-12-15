@@ -14,7 +14,7 @@ class MicroOp extends Bundle {
   val jmp_op  = UInt(JMP_NONE.length.W)
   val mdu_op  = UInt(MDU_X.length.W)
   val lsu_op  = UInt(LSU_NONE.length.W)
-  val lsu_len = UInt(LSU_X.length.W)
+  val mem_len = UInt(MEM_X.length.W)
   val csr_op  = UInt(CSR_X.length.W)
   val sys_op  = UInt(SYS_X.length.W)
 
@@ -38,7 +38,7 @@ class MicroOp extends Bundle {
       jmp_op,
       mdu_op,
       lsu_op,
-      lsu_len,
+      mem_len,
       csr_op,
       sys_op,
       rs1_src,
