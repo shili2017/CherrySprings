@@ -5,7 +5,7 @@ import chipsalliance.rocketchip.config._
 import Constant._
 import difftest._
 
-class Core(implicit p: Parameters) extends Module {
+class Core(implicit p: Parameters) extends CherrySpringsModule {
   val io = IO(new Bundle {
     val imem = new CachePortIO
     val dmem = new CachePortIO
@@ -36,9 +36,9 @@ class Core(implicit p: Parameters) extends Module {
   rf.io.rs1_index := decode.io.out.rs1_index
   rf.io.rs2_index := decode.io.out.rs2_index
 
-  val id_rs1_data         = Wire(UInt(32.W))
-  val id_rs2_data         = Wire(UInt(32.W))
-  val id_rs2_data_from_rf = Wire(UInt(32.W))
+  val id_rs1_data         = Wire(UInt(xLen.W))
+  val id_rs2_data         = Wire(UInt(xLen.W))
+  val id_rs2_data_from_rf = Wire(UInt(xLen.W))
   val id_ex               = Module(new PipelineReg(new DXPacket))
   id_ex.io.in.uop              := decode.io.out
   id_ex.io.in.rs1_data         := id_rs1_data
@@ -136,9 +136,9 @@ class Core(implicit p: Parameters) extends Module {
       decode.io.out.rs1_src,
       0.U,
       Array(
-        s"b$RS_PC".U  -> if_id.io.out.pc,
+        s"b$RS_PC".U  -> ZeroExt32_64(if_id.io.out.pc),
         s"b$RS_RF".U  -> rf.io.rs1_data,
-        s"b$RS_IMM".U -> decode.io.out.imm
+        s"b$RS_IMM".U -> SignExt32_64(decode.io.out.imm)
       )
     )
   }
@@ -160,9 +160,9 @@ class Core(implicit p: Parameters) extends Module {
       decode.io.out.rs2_src,
       0.U,
       Array(
-        s"b$RS_PC".U  -> if_id.io.out.pc,
+        s"b$RS_PC".U  -> ZeroExt32_64(if_id.io.out.pc),
         s"b$RS_RF".U  -> rf.io.rs2_data,
-        s"b$RS_IMM".U -> decode.io.out.imm
+        s"b$RS_IMM".U -> SignExt32_64(decode.io.out.imm)
       )
     )
   }
@@ -196,7 +196,7 @@ class Core(implicit p: Parameters) extends Module {
   cycle_cnt := cycle_cnt + 1.U
   instr_cnt := instr_cnt + commit_uop.valid.asUInt
 
-  if (p(EnableDifftest)) {
+  if (enableDifftest) {
     val diff_ic = Module(new DifftestInstrCommit)
     diff_ic.io.clock   := clock
     diff_ic.io.coreid  := 0.U
@@ -208,9 +208,10 @@ class Core(implicit p: Parameters) extends Module {
     diff_ic.io.skip    := false.B
     diff_ic.io.isRVC   := false.B
     diff_ic.io.rfwen   := commit_uop.rd_wen
+    diff_ic.io.fpwen   := false.B
     diff_ic.io.wpdest  := commit_uop.rd_index
     diff_ic.io.wdest   := commit_uop.rd_index
-    if (p(Debug)) {
+    if (debug) {
       when(commit_uop.valid) {
         printf(
           "%d [COMMIT] pc=%x instr=%x wen=%x wdest=%d\n",
@@ -223,9 +224,20 @@ class Core(implicit p: Parameters) extends Module {
       }
     }
 
-    val trap  = (commit_uop.instr === "h0000006b".U) && commit_uop.valid
-    val rf_a0 = WireInit(0.U(64.W))
+    val diff_wb = Module(new DifftestIntWriteback)
+    diff_wb.io.clock  := clock
+    diff_wb.io.coreid := 0.U
+    diff_wb.io.valid  := commit_uop.valid && commit_uop.rd_wen
+    diff_wb.io.dest   := commit_uop.rd_index
+    diff_wb.io.data   := mem_wb.io.out.rd_data
+
+    val trap  = (commit_uop.instr === HALT()) && commit_uop.valid
+    val rf_a0 = WireInit(0.U(xLen.W))
     BoringUtils.addSink(rf_a0, "rf_a0")
+
+    when(commit_uop.instr === PUTCH() && commit_uop.valid) {
+      printf("%c", rf_a0(7, 0))
+    }
 
     val diff_te = Module(new DifftestTrapEvent)
     diff_te.io.clock    := clock

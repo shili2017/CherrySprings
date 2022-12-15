@@ -1,7 +1,8 @@
 import chisel3._
 import chisel3.util.experimental.decode._
+import chipsalliance.rocketchip.config._
 
-class Decode extends Module {
+class Decode(implicit p: Parameters) extends CherrySpringsModule {
   val io = IO(new Bundle {
     val in  = Input(new FDPacket)
     val out = Output(new MicroOp)

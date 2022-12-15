@@ -26,6 +26,7 @@ class MicroOp extends Bundle {
   val rd_index  = UInt(5.W)
   val rd_wen    = Bool()
   val imm       = UInt(32.W)
+  val dw        = Bool()
 
   def from_decoder(in: UInt): Unit = {
     val imm_type = WireInit(0.U(IMM_X.length.W))
@@ -43,7 +44,8 @@ class MicroOp extends Bundle {
       rs1_src,
       rs2_src,
       rd_wen,
-      imm_type
+      imm_type,
+      dw
     )
     var i = 0
     for (entry <- entries.reverse) {

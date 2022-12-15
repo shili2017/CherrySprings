@@ -5,7 +5,11 @@ import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.amba.axi4._
 
-class CachePortToTileLinkBridge(source: Int)(implicit p: Parameters) extends LazyModule {
+class CachePortToTileLinkBridge(source: Int)(implicit p: Parameters)
+    extends LazyModule
+    with HasCherrySpringsParameters {
+  require(xLen == 64)
+
   val node = TLClientNode(
     Seq(
       TLMasterPortParameters.v1(
@@ -33,18 +37,16 @@ class CachePortToTileLinkBridge(source: Int)(implicit p: Parameters) extends Laz
     resp.valid := tl.d.valid
     tl.d.ready := resp.ready
 
-    // 32-bit CachePortIO to 64-bit TileLink/AXI4
-    val req_addr   = Cat(req.bits.addr(31, 3), Fill(3, 0.U))
-    val req_offset = req.bits.addr(2).asBool
-    val req_wdata  = Mux(req_offset, Cat(req.bits.wdata, 0.U(32.W)), Cat(0.U(32.W), req.bits.wdata))
-    val req_wmask  = Mux(req_offset, Cat(req.bits.wmask, 0.U(4.W)), Cat(0.U(4.W), req.bits.wmask))
-    val req_addr_2 = RegEnable(req_offset, false.B, req.fire)
+    // 64-bit CachePortIO to 64-bit TileLink/AXI4
+    val req_addr  = Cat(req.bits.addr(31, 3), Fill(3, 0.U))
+    val req_wdata = req.bits.wdata
+    val req_wmask = req.bits.wmask
 
     val (_, get_bits) = edge.Get(source.U, req_addr, 3.U)
     val (_, put_bits) = edge.Put(source.U, req_addr, 3.U, req_wdata, req_wmask)
 
     tl.a.bits       := Mux(req.bits.wen, put_bits, get_bits)
-    resp.bits.rdata := Mux(req_addr_2, tl.d.bits.data(63, 32), tl.d.bits.data(31, 0))
+    resp.bits.rdata := tl.d.bits.data
   }
 }
 

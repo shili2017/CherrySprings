@@ -3,18 +3,18 @@ import chipsalliance.rocketchip.config._
 import chisel3.util.experimental.BoringUtils
 import difftest._
 
-class RegFile(implicit p: Parameters) extends Module {
+class RegFile(implicit p: Parameters) extends CherrySpringsModule {
   val io = IO(new Bundle {
     val rs1_index = Input(UInt(5.W))
     val rs2_index = Input(UInt(5.W))
-    val rs1_data  = Output(UInt(32.W))
-    val rs2_data  = Output(UInt(32.W))
+    val rs1_data  = Output(UInt(xLen.W))
+    val rs2_data  = Output(UInt(xLen.W))
     val rd_index  = Input(UInt(5.W))
-    val rd_data   = Input(UInt(32.W))
+    val rd_data   = Input(UInt(xLen.W))
     val rd_wen    = Input(Bool())
   })
 
-  val rf = RegInit(VecInit(Seq.fill(32)(0.U(32.W))))
+  val rf = RegInit(VecInit(Seq.fill(32)(0.U(xLen.W))))
 
   when(io.rd_wen && (io.rd_index =/= 0.U)) {
     rf(io.rd_index) := io.rd_data;
@@ -32,7 +32,7 @@ class RegFile(implicit p: Parameters) extends Module {
     }
   }
 
-  if (p(EnableDifftest)) {
+  if (enableDifftest) {
     val dt_ar = Module(new DifftestArchIntRegState)
     dt_ar.io.clock  := clock
     dt_ar.io.coreid := 0.U

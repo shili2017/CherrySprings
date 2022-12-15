@@ -1,14 +1,17 @@
 import chisel3._
 import chisel3.util._
 import Constant._
+import chipsalliance.rocketchip.config._
 
-class LSU extends Module {
+class LSU(implicit p: Parameters) extends CherrySpringsModule {
+  require(xLen == 32 || xLen == 64)
+
   val io = IO(new Bundle {
     val uop    = Input(new MicroOp)
     val is_mem = Input(Bool())
     val addr   = Input(UInt(32.W))
-    val wdata  = Input(UInt(32.W))
-    val rdata  = Output(UInt(32.W))
+    val wdata  = Input(UInt(xLen.W))
+    val rdata  = Output(UInt(xLen.W))
     val valid  = Output(Bool())
     val dmem   = new CachePortIO
     val ready  = Output(Bool())
@@ -25,27 +28,40 @@ class LSU extends Module {
   val s_idle :: s_req :: s_resp :: Nil = Enum(3)
   val state                            = RegInit(s_idle)
 
-  val addr_offset = addr(1, 0)
-  val wmask = MuxLookup(
-    uop.lsu_len,
-    0.U,
-    Array(
-      s"b$LSU_BYTE".U -> "b0001".U(4.W),
-      s"b$LSU_HALF".U -> "b0011".U(4.W),
-      s"b$LSU_WORD".U -> "b1111".U(4.W)
+  val addr_offset = if (xLen == 32) addr(1, 0) else addr(2, 0)
+  val wmask = if (xLen == 32) {
+    MuxLookup(
+      uop.lsu_len,
+      0.U,
+      Array(
+        s"b$LSU_BYTE".U -> "b0001".U(4.W),
+        s"b$LSU_HALF".U -> "b0011".U(4.W),
+        s"b$LSU_WORD".U -> "b1111".U(4.W)
+      )
     )
-  )
+  } else {
+    MuxLookup(
+      uop.lsu_len,
+      0.U,
+      Array(
+        s"b$LSU_BYTE".U  -> "b00000001".U(8.W),
+        s"b$LSU_HALF".U  -> "b00000011".U(8.W),
+        s"b$LSU_WORD".U  -> "b00001111".U(8.W),
+        s"b$LSU_DWORD".U -> "b11111111".U(8.W)
+      )
+    )
+  }
 
   req.bits.addr  := addr
-  req.bits.wdata := (wdata << (addr_offset << 3))(31, 0)
-  req.bits.wmask := (wmask << addr_offset)(3, 0)
+  req.bits.wdata := (wdata << (addr_offset << 3))(xLen - 1, 0)
+  req.bits.wmask := (wmask << addr_offset)(xLen / 8 - 1, 0)
   req.bits.wen   := is_store
   req.valid      := (state === s_req) && uop.valid && is_mem
   resp.ready     := (state === s_resp)
 
   val resp_data = resp.bits.rdata >> (addr_offset << 3)
-  val ld_out    = Wire(UInt(64.W))
-  val ldu_out   = Wire(UInt(64.W))
+  val ld_out    = Wire(UInt(xLen.W))
+  val ldu_out   = Wire(UInt(xLen.W))
 
   switch(state) {
     is(s_idle) {
@@ -65,25 +81,47 @@ class LSU extends Module {
     }
   }
 
-  ld_out := MuxLookup(
-    uop.lsu_len,
-    0.U,
-    Array(
-      s"b$LSU_BYTE".U -> Cat(Fill(56, resp_data(7)), resp_data(7, 0)),
-      s"b$LSU_HALF".U -> Cat(Fill(48, resp_data(15)), resp_data(15, 0)),
-      s"b$LSU_WORD".U -> Cat(Fill(32, resp_data(31)), resp_data(31, 0))
+  if (xLen == 32) {
+    ld_out := MuxLookup(
+      uop.lsu_len,
+      0.U,
+      Array(
+        s"b$LSU_BYTE".U -> Cat(Fill(24, resp_data(7)), resp_data(7, 0)),
+        s"b$LSU_HALF".U -> Cat(Fill(16, resp_data(15)), resp_data(15, 0)),
+        s"b$LSU_WORD".U -> resp_data
+      )
     )
-  )
 
-  ldu_out := MuxLookup(
-    uop.lsu_len,
-    0.U,
-    Array(
-      s"b$LSU_BYTE".U -> Cat(Fill(56, 0.U), resp_data(7, 0)),
-      s"b$LSU_HALF".U -> Cat(Fill(48, 0.U), resp_data(15, 0)),
-      s"b$LSU_WORD".U -> Cat(Fill(32, 0.U), resp_data(31, 0))
+    ldu_out := MuxLookup(
+      uop.lsu_len,
+      0.U,
+      Array(
+        s"b$LSU_BYTE".U -> Cat(Fill(24, 0.U), resp_data(7, 0)),
+        s"b$LSU_HALF".U -> Cat(Fill(16, 0.U), resp_data(15, 0))
+      )
     )
-  )
+  } else {
+    ld_out := MuxLookup(
+      uop.lsu_len,
+      0.U,
+      Array(
+        s"b$LSU_BYTE".U  -> Cat(Fill(56, resp_data(7)), resp_data(7, 0)),
+        s"b$LSU_HALF".U  -> Cat(Fill(48, resp_data(15)), resp_data(15, 0)),
+        s"b$LSU_WORD".U  -> Cat(Fill(32, resp_data(31)), resp_data(31, 0)),
+        s"b$LSU_DWORD".U -> resp_data
+      )
+    )
+
+    ldu_out := MuxLookup(
+      uop.lsu_len,
+      0.U,
+      Array(
+        s"b$LSU_BYTE".U -> Cat(Fill(56, 0.U), resp_data(7, 0)),
+        s"b$LSU_HALF".U -> Cat(Fill(48, 0.U), resp_data(15, 0)),
+        s"b$LSU_WORD".U -> Cat(Fill(32, 0.U), resp_data(31, 0))
+      )
+    )
+  }
 
   io.rdata := MuxLookup(
     uop.lsu_op,

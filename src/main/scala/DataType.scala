@@ -1,32 +1,33 @@
 import chisel3._
 import chisel3.util._
+import chipsalliance.rocketchip.config._
 
-class FDPacket extends Bundle {
+class FDPacket(implicit p: Parameters) extends CherrySpringsBundle {
   val pc    = UInt(32.W)
   val instr = UInt(32.W)
   val valid = Bool()
 }
 
-class DXPacket extends Bundle {
+class DXPacket(implicit p: Parameters) extends CherrySpringsBundle {
   val uop              = new MicroOp
-  val rs1_data         = UInt(32.W)
-  val rs2_data         = UInt(32.W)
-  val rs2_data_from_rf = UInt(32.W)
+  val rs1_data         = UInt(xLen.W)
+  val rs2_data         = UInt(xLen.W)
+  val rs2_data_from_rf = UInt(xLen.W)
 }
 
-class XMPacket extends Bundle {
-  val rs1_data         = UInt(32.W)
-  val rs2_data_from_rf = UInt(32.W)
-  val rd_data          = UInt(32.W)
+class XMPacket(implicit p: Parameters) extends CherrySpringsBundle {
+  val rs1_data         = UInt(xLen.W)
+  val rs2_data_from_rf = UInt(xLen.W)
+  val rd_data          = UInt(xLen.W)
   val uop              = new MicroOp
 }
 
-class MWPacket extends Bundle {
+class MWPacket(implicit p: Parameters) extends CherrySpringsBundle {
   val uop     = new MicroOp
-  val rd_data = UInt(32.W)
+  val rd_data = UInt(xLen.W)
 }
 
-class PipelineReg[T <: Bundle](packet: T) extends Module {
+class PipelineReg[T <: Bundle](packet: T)(implicit p: Parameters) extends CherrySpringsModule {
   val io = IO(new Bundle {
     val in    = Input(packet)
     val out   = Output(packet)
@@ -38,7 +39,7 @@ class PipelineReg[T <: Bundle](packet: T) extends Module {
   io.out := reg
 }
 
-class JmpPacket extends Bundle {
+class JmpPacket(implicit p: Parameters) extends CherrySpringsBundle {
   val valid  = Bool()
   val target = UInt(32.W)
 }

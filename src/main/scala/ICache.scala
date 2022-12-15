@@ -5,7 +5,9 @@ import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.amba.axi4._
 
-class ICache(source: Int, size: Int)(implicit p: Parameters) extends LazyModule {
+class ICache(source: Int, size: Int)(implicit p: Parameters) extends LazyModule with HasCherrySpringsParameters {
+  require(xLen == 64)
+
   val node = TLClientNode(
     Seq(
       TLMasterPortParameters.v1(
@@ -28,14 +30,14 @@ class ICache(source: Int, size: Int)(implicit p: Parameters) extends LazyModule 
     })
     val (tl, edge) = node.out.head
 
-    def getOffset(x: UInt) = x(4, 2)
+    def getOffset(x: UInt) = x(4, 3)
     def getIndex(x:  UInt) = x(4 + log2Up(size), 5)
     def getTag(x:    UInt) = x(31, 5 + log2Up(size))
 
     val req  = io.cache.req
     val resp = io.cache.resp
 
-    // Directed-mapped, #size sets, 8-word cacheline, read-only
+    // Directed-mapped, #size sets, 4x64-bit cacheline, read-only
     val array        = Module(new SRAM(size))
     val valid        = RegInit(VecInit(Seq.fill(size)(false.B)))
     val tag          = RegInit(VecInit(Seq.fill(size)(0.U((32 - 5 - log2Up(size)).W))))
@@ -79,24 +81,20 @@ class ICache(source: Int, size: Int)(implicit p: Parameters) extends LazyModule 
     val data_from_cache = HoldUnless(
       MuxLookup(
         getOffset(addr_r),
-        0.U(32.W),
+        0.U(64.W),
         Array(
-          0.U -> array.io.rdata(31, 0),
-          1.U -> array.io.rdata(63, 32),
-          2.U -> array.io.rdata(95, 64),
-          3.U -> array.io.rdata(127, 96),
-          4.U -> array.io.rdata(159, 128),
-          5.U -> array.io.rdata(191, 160),
-          6.U -> array.io.rdata(223, 192),
-          7.U -> array.io.rdata(255, 224)
+          0.U -> array.io.rdata(63, 0),
+          1.U -> array.io.rdata(127, 64),
+          2.U -> array.io.rdata(191, 128),
+          3.U -> array.io.rdata(255, 192)
         )
       ),
       RegNext(req.fire)
     )
     val data_from_memory = RegEnable(
-      Mux(addr_r(2), tl.d.bits.data(63, 32), tl.d.bits.data(31, 0)),
-      0.U(32.W),
-      tl.d.fire && refill_count === addr_r(4, 3)
+      tl.d.bits.data,
+      0.U(64.W),
+      tl.d.fire && refill_count === getOffset(addr_r)
     )
 
     array.io.addr  := Mux(state === s_check, getIndex(io.cache.req.bits.addr), getIndex(addr_r))
