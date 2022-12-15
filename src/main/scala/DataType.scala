@@ -8,17 +8,17 @@ class FDPacket extends Bundle {
 }
 
 class DXPacket extends Bundle {
-  val uop      = new MicroOp
-  val rs1_data = UInt(32.W)
-  val rs2_data = UInt(32.W)
-  val st_data  = UInt(32.W)
+  val uop              = new MicroOp
+  val rs1_data         = UInt(32.W)
+  val rs2_data         = UInt(32.W)
+  val rs2_data_from_rf = UInt(32.W)
 }
 
 class XMPacket extends Bundle {
-  val rs1_data = UInt(32.W)
-  val st_data  = UInt(32.W)
-  val rd_data  = UInt(32.W)
-  val uop      = new MicroOp
+  val rs1_data         = UInt(32.W)
+  val rs2_data_from_rf = UInt(32.W)
+  val rd_data          = UInt(32.W)
+  val uop              = new MicroOp
 }
 
 class MWPacket extends Bundle {

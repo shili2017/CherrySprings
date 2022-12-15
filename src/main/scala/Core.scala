@@ -36,15 +36,16 @@ class Core(implicit p: Parameters) extends Module {
   rf.io.rs1_index := decode.io.out.rs1_index
   rf.io.rs2_index := decode.io.out.rs2_index
 
-  val id_rs1_data = Wire(UInt(32.W))
-  val id_rs2_data = Wire(UInt(32.W))
-  val id_ex       = Module(new PipelineReg(new DXPacket))
-  id_ex.io.in.uop      := decode.io.out
-  id_ex.io.in.rs1_data := id_rs1_data
-  id_ex.io.in.rs2_data := id_rs2_data
-  id_ex.io.in.st_data  := rf.io.rs2_data
-  id_ex.io.en          := stall_b
-  id_ex.io.flush       := flush
+  val id_rs1_data         = Wire(UInt(32.W))
+  val id_rs2_data         = Wire(UInt(32.W))
+  val id_rs2_data_from_rf = Wire(UInt(32.W))
+  val id_ex               = Module(new PipelineReg(new DXPacket))
+  id_ex.io.in.uop              := decode.io.out
+  id_ex.io.in.rs1_data         := id_rs1_data
+  id_ex.io.in.rs2_data         := id_rs2_data
+  id_ex.io.in.rs2_data_from_rf := id_rs2_data_from_rf
+  id_ex.io.en                  := stall_b
+  id_ex.io.flush               := flush
 
   /* ----- Stage 3 - Execution (EX) ---------------- */
 
@@ -69,9 +70,9 @@ class Core(implicit p: Parameters) extends Module {
   )
 
   val ex_mem = Module(new PipelineReg(new XMPacket))
-  ex_mem.io.in.uop      := id_ex.io.out.uop
-  ex_mem.io.in.rs1_data := id_ex.io.out.rs1_data
-  ex_mem.io.in.st_data  := id_ex.io.out.st_data
+  ex_mem.io.in.uop              := id_ex.io.out.uop
+  ex_mem.io.in.rs1_data         := id_ex.io.out.rs1_data
+  ex_mem.io.in.rs2_data_from_rf := id_ex.io.out.rs2_data_from_rf
   ex_mem.io.in.rd_data := Mux(
     id_ex.io.out.uop.jmp_op === s"b$JMP_JAL".U || id_ex.io.out.uop.jmp_op === s"b$JMP_JALR".U,
     id_ex.io.out.uop.pc + 4.U,
@@ -89,14 +90,14 @@ class Core(implicit p: Parameters) extends Module {
   lsu.io.uop    := ex_mem.io.out.uop
   lsu.io.is_mem := is_mem
   lsu.io.addr   := ex_mem.io.out.rd_data
-  lsu.io.wdata  := ex_mem.io.out.st_data
+  lsu.io.wdata  := ex_mem.io.out.rs2_data_from_rf
   lsu.io.dmem   <> io.dmem
 
   val mdu = Module(new MDU)
   mdu.io.uop    := ex_mem.io.out.uop
   mdu.io.is_mdu := is_mdu
   mdu.io.in1    := ex_mem.io.out.rs1_data
-  mdu.io.in2    := ex_mem.io.out.st_data
+  mdu.io.in2    := ex_mem.io.out.rs2_data_from_rf
 
   val mem_wb = Module(new PipelineReg(new MWPacket))
   mem_wb.io.in.uop       := ex_mem.io.out.uop
@@ -114,8 +115,9 @@ class Core(implicit p: Parameters) extends Module {
 
   /* ----- Forwarding Unit ------------------------- */
 
-  val need_rs1 = decode.io.out.rs1_src === s"b$RS_RF".U
-  val need_rs2 = decode.io.out.rs2_src === s"b$RS_RF".U || decode.io.out.lsu_op === s"b$LSU_ST".U
+  val need_rs1         = decode.io.out.rs1_src === s"b$RS_RF".U
+  val need_rs2         = decode.io.out.rs2_src === s"b$RS_RF".U
+  val need_rs2_from_rf = decode.io.out.lsu_op === s"b$LSU_ST".U || decode.io.out.fu === s"b$FU_MDU".U
 
   when(
     need_rs1 && id_ex.io.out.uop.rd_wen
@@ -163,6 +165,22 @@ class Core(implicit p: Parameters) extends Module {
         s"b$RS_IMM".U -> decode.io.out.imm
       )
     )
+  }
+
+  when(
+    need_rs2_from_rf && id_ex.io.out.uop.rd_wen
+      && decode.io.out.rs2_index === id_ex.io.out.uop.rd_index
+      && decode.io.out.rs2_index =/= 0.U
+  ) {
+    id_rs2_data_from_rf := ex_mem.io.in.rd_data
+  }.elsewhen(
+    need_rs2_from_rf && ex_mem.io.out.uop.rd_wen
+      && decode.io.out.rs2_index === ex_mem.io.out.uop.rd_index
+      && decode.io.out.rs2_index =/= 0.U
+  ) {
+    id_rs2_data_from_rf := mem_wb.io.in.rd_data
+  }.otherwise {
+    id_rs2_data_from_rf := rf.io.rs2_data
   }
 
   /* ----- Pipeline Control Signals -------------- */

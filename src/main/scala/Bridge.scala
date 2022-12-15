@@ -60,8 +60,8 @@ class DiplomacyToAXI4Bridge(implicit p: Parameters) extends LazyModule {
             resources     = device.reg,
             regionType    = RegionType.UNCACHED,
             executable    = true,
-            supportsWrite = TransferSizes(1, beatBytes),
-            supportsRead  = TransferSizes(1, beatBytes)
+            supportsWrite = TransferSizes(1, beatBytes * 4),
+            supportsRead  = TransferSizes(1, beatBytes * 4)
           )
         ),
         beatBytes  = beatBytes,

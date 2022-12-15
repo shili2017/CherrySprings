@@ -6,12 +6,12 @@ import freechips.rocketchip.tilelink._
 import freechips.rocketchip.amba.axi4._
 
 class SimTop(implicit p: Parameters) extends LazyModule {
-  val bridge_imem = LazyModule(new CachePortToTileLinkBridge(0))
+  val icache      = LazyModule(new ICache(0, 32))
   val bridge_dmem = LazyModule(new CachePortToTileLinkBridge(1))
   val xbar        = LazyModule(new TLXbar)
   val mem         = LazyModule(new DiplomacyToAXI4Bridge())
 
-  xbar.node := bridge_imem.node
+  xbar.node := icache.node
   xbar.node := bridge_dmem.node
 
   (mem.node
@@ -30,7 +30,7 @@ class SimTop(implicit p: Parameters) extends LazyModule {
 
     val core = Module(new Core)
 
-    bridge_imem.module.io.cache <> core.io.imem
+    icache.module.io.cache      <> core.io.imem
     bridge_dmem.module.io.cache <> core.io.dmem
     io.memAXI_0                 <> mem.module.io.axi4
 
