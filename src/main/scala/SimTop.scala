@@ -30,6 +30,7 @@ class SimTop(implicit p: Parameters) extends LazyModule {
 
     val core = Module(new Core)
 
+    icache.module.io.fence_i    := core.io.fence_i
     icache.module.io.cache      <> core.io.imem
     bridge_dmem.module.io.cache <> core.io.dmem
     io.memAXI_0                 <> mem.module.io.axi4

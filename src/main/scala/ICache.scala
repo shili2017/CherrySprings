@@ -26,7 +26,8 @@ class ICache(source: Int, size: Int)(implicit p: Parameters) extends LazyModule 
 
   lazy val module = new LazyModuleImp(this) {
     val io = IO(new Bundle {
-      val cache = Flipped(new CachePortIO)
+      val cache   = Flipped(new CachePortIO)
+      val fence_i = Input(Bool())
     })
     val (tl, edge) = node.out.head
 
@@ -45,6 +46,12 @@ class ICache(source: Int, size: Int)(implicit p: Parameters) extends LazyModule 
     val hit_r        = RegEnable(hit, false.B, req.fire)
     val addr_r       = RegEnable(req.bits.addr, 0.U, req.fire)
     val refill_count = RegInit(0.U(2.W)) // saturation counter (0 -> 1 -> 2 -> 3 -> 0)
+
+    when(io.fence_i) {
+      for (i <- 0 until size) {
+        valid(i) := false.B
+      }
+    }
 
     val s_check :: s_req :: s_resp :: s_ok :: Nil = Enum(4)
     val state                                     = RegInit(s_check)

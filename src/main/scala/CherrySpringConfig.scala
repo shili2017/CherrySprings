@@ -2,9 +2,9 @@ import chipsalliance.rocketchip.config._
 import chisel3._
 
 case object EnableDifftest extends Field[Boolean]
-case object Debug extends Field[Boolean]
+case object DebugCommit extends Field[Boolean]
+case object DebugLoadStore extends Field[Boolean]
 case object ResetPC extends Field[BigInt]
-case object XLen extends Field[Int]
 
 class CoreConfig
     extends Config((site, here, up) => {
@@ -14,7 +14,8 @@ class CoreConfig
 
 class DebugConfig
     extends Config((site, here, up) => {
-      case Debug => false
+      case DebugCommit    => false
+      case DebugLoadStore => false
     })
 
 class CherrySpringsConfig extends Config(new CoreConfig ++ new DebugConfig)
@@ -23,7 +24,8 @@ trait HasCherrySpringsParameters {
   implicit val p: Parameters
   def enableDifftest: Boolean = p(EnableDifftest)
   def resetPC:        BigInt  = p(ResetPC)
-  def debug:          Boolean = p(Debug)
+  def debugCommit:    Boolean = p(DebugCommit)
+  def debugLoadStore: Boolean = p(DebugLoadStore)
   def xLen:           Int     = 64
 }
 

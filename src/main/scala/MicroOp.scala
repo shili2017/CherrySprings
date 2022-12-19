@@ -7,13 +7,14 @@ class MicroOp extends Bundle {
   val illegal = Bool()
 
   val pc    = UInt(32.W)
+  val npc   = UInt(32.W)
   val instr = UInt(32.W)
 
-  val fu      = UInt(FU_ALU.length.W)
+  val fu      = UInt(FU_X.length.W)
   val alu_op  = UInt(ALU_X.length.W)
-  val jmp_op  = UInt(JMP_NONE.length.W)
+  val jmp_op  = UInt(JMP_X.length.W)
   val mdu_op  = UInt(MDU_X.length.W)
-  val lsu_op  = UInt(LSU_NONE.length.W)
+  val lsu_op  = UInt(LSU_X.length.W)
   val mem_len = UInt(MEM_X.length.W)
   val csr_op  = UInt(CSR_X.length.W)
   val sys_op  = UInt(SYS_X.length.W)

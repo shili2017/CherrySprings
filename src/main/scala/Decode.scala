@@ -12,6 +12,7 @@ class Decode(implicit p: Parameters) extends CherrySpringsModule {
   val uop   = WireInit(0.U.asTypeOf(new MicroOp))
 
   uop.pc        := io.in.pc
+  uop.npc       := io.in.pc + 4.U
   uop.instr     := instr
   uop.rs1_index := instr(19, 15)
   uop.rs2_index := instr(24, 20)
