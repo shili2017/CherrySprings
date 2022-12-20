@@ -35,7 +35,7 @@ class RegFile(implicit p: Parameters) extends CherrySpringsModule {
   if (enableDifftest) {
     val dt_ar = Module(new DifftestArchIntRegState)
     dt_ar.io.clock  := clock
-    dt_ar.io.coreid := 0.U
+    dt_ar.io.coreid := hartID.U
     for (i <- 0 until 32) {
       dt_ar.io.gpr(i) := Mux(io.rd_wen && (io.rd_index === i.U) && (io.rd_index =/= 0.U), io.rd_data, rf(i))
     }

@@ -112,14 +112,13 @@ class Core(implicit p: Parameters) extends CherrySpringsModule {
   mdu.io.in2    := ex_mem.io.out.rs2_data_from_rf
 
   val csr = Module(new CSR)
-  csr.io.sys_cmd  := ex_mem.io.out.uop.sys_op
+  csr.io.uop      := ex_mem.io.out.uop
   csr.io.rw.addr  := ex_mem.io.out.uop.instr(31, 20)
   csr.io.rw.cmd   := ex_mem.io.out.uop.csr_op
   csr.io.rw.wdata := ex_mem.io.out.rs1_data
+  sys_jmp_packet  := csr.io.jmp_packet
 
-  sys_jmp_packet.valid  := csr.io.fence_i
-  sys_jmp_packet.target := ex_mem.io.out.uop.npc
-  io.fence_i            := csr.io.fence_i
+  io.fence_i := csr.io.fence_i
 
   val mem_wb = Module(new PipelineReg(new MWPacket))
   mem_wb.io.in.uop       := ex_mem.io.out.uop
@@ -231,7 +230,7 @@ class Core(implicit p: Parameters) extends CherrySpringsModule {
   if (enableDifftest) {
     val diff_ic = Module(new DifftestInstrCommit)
     diff_ic.io.clock   := clock
-    diff_ic.io.coreid  := 0.U
+    diff_ic.io.coreid  := hartID.U
     diff_ic.io.index   := 0.U
     diff_ic.io.pc      := commit_uop.pc
     diff_ic.io.instr   := commit_uop.instr
@@ -258,7 +257,7 @@ class Core(implicit p: Parameters) extends CherrySpringsModule {
 
     val diff_wb = Module(new DifftestIntWriteback)
     diff_wb.io.clock  := clock
-    diff_wb.io.coreid := 0.U
+    diff_wb.io.coreid := hartID.U
     diff_wb.io.valid  := commit_uop.valid && commit_uop.rd_wen
     diff_wb.io.dest   := commit_uop.rd_index
     diff_wb.io.data   := mem_wb.io.out.rd_data
@@ -273,7 +272,7 @@ class Core(implicit p: Parameters) extends CherrySpringsModule {
 
     val diff_te = Module(new DifftestTrapEvent)
     diff_te.io.clock    := clock
-    diff_te.io.coreid   := 0.U
+    diff_te.io.coreid   := hartID.U
     diff_te.io.valid    := trap
     diff_te.io.cycleCnt := cycle_cnt
     diff_te.io.instrCnt := instr_cnt
@@ -283,7 +282,7 @@ class Core(implicit p: Parameters) extends CherrySpringsModule {
 
     val diff_ae = Module(new DifftestArchEvent)
     diff_ae.io.clock         := clock
-    diff_ae.io.coreid        := 0.U
+    diff_ae.io.coreid        := hartID.U
     diff_ae.io.intrNO        := 0.U
     diff_ae.io.cause         := 0.U
     diff_ae.io.exceptionPC   := 0.U

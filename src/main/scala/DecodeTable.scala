@@ -72,6 +72,7 @@ object DecodeTable {
     FENCE     -> Seq(Y, N, FU_SYS, ALU_ADD,  JMP_N,    MDU_X,      LSU_N,       MEM_X,     CSR_N,  SYS_FENCE,  RS_ZERO, RS_ZERO, N, IMM_X, Y),
     FENCE_I   -> Seq(Y, N, FU_SYS, ALU_ADD,  JMP_N,    MDU_X,      LSU_N,       MEM_X,     CSR_N,  SYS_FENCEI, RS_ZERO, RS_ZERO, N, IMM_X, Y),
     MRET      -> Seq(Y, N, FU_SYS, ALU_ADD,  JMP_N,    MDU_X,      LSU_N,       MEM_X,     CSR_N,  SYS_MRET,   RS_ZERO, RS_ZERO, N, IMM_X, Y),
+    SRET      -> Seq(Y, N, FU_SYS, ALU_ADD,  JMP_N,    MDU_X,      LSU_N,       MEM_X,     CSR_N,  SYS_SRET,   RS_ZERO, RS_ZERO, N, IMM_X, Y),
     // CSR
     CSRRW     -> Seq(Y, N, FU_CSR, ALU_X,    JMP_N,    MDU_X,      LSU_N,       MEM_X,     CSR_RW, SYS_N,      RS_RF,   RS_X,    Y, IMM_X, Y),
     CSRRS     -> Seq(Y, N, FU_CSR, ALU_X,    JMP_N,    MDU_X,      LSU_N,       MEM_X,     CSR_RS, SYS_N,      RS_RF,   RS_X,    Y, IMM_X, Y),

@@ -75,8 +75,9 @@ trait Constant {
   val SYS_N      = "000"
   val SYS_ECALL  = "001"
   val SYS_MRET   = "010"
-  val SYS_FENCE  = "011"
-  val SYS_FENCEI = "100"
+  val SYS_SRET   = "011"
+  val SYS_FENCE  = "100"
+  val SYS_FENCEI = "101"
 
   val RS_X    = "??"
   val RS_ZERO = "00"
