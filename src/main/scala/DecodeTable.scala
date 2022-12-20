@@ -96,8 +96,8 @@ object DecodeTable {
     // RV64A
     LR_W      -> Seq(Y, N, FU_LSU, ALU_ADD,  JMP_N,    MDU_X,      LSU_LR,      MEM_WORD,  CSR_N,  SYS_N,      RS_RF,   RS_ZERO, Y, IMM_X, Y),
     LR_D      -> Seq(Y, N, FU_LSU, ALU_ADD,  JMP_N,    MDU_X,      LSU_LR,      MEM_DWORD, CSR_N,  SYS_N,      RS_RF,   RS_ZERO, Y, IMM_X, Y),
-    SC_W      -> Seq(Y, N, FU_LSU, ALU_ADD,  JMP_N,    MDU_X,      LSU_SC,      MEM_WORD,  CSR_N,  SYS_N,      RS_RF,   RS_ZERO, N, IMM_X, Y),
-    SC_D      -> Seq(Y, N, FU_LSU, ALU_ADD,  JMP_N,    MDU_X,      LSU_SC,      MEM_DWORD, CSR_N,  SYS_N,      RS_RF,   RS_ZERO, N, IMM_X, Y),
+    SC_W      -> Seq(Y, N, FU_LSU, ALU_ADD,  JMP_N,    MDU_X,      LSU_SC,      MEM_WORD,  CSR_N,  SYS_N,      RS_RF,   RS_ZERO, Y, IMM_X, Y),
+    SC_D      -> Seq(Y, N, FU_LSU, ALU_ADD,  JMP_N,    MDU_X,      LSU_SC,      MEM_DWORD, CSR_N,  SYS_N,      RS_RF,   RS_ZERO, Y, IMM_X, Y),
     AMOSWAP_W -> Seq(Y, N, FU_LSU, ALU_ADD,  JMP_N,    MDU_X,      LSU_AMOSWAP, MEM_WORD,  CSR_N,  SYS_N,      RS_RF,   RS_ZERO, Y, IMM_X, Y),
     AMOSWAP_D -> Seq(Y, N, FU_LSU, ALU_ADD,  JMP_N,    MDU_X,      LSU_AMOSWAP, MEM_DWORD, CSR_N,  SYS_N,      RS_RF,   RS_ZERO, Y, IMM_X, Y),
     AMOADD_W  -> Seq(Y, N, FU_LSU, ALU_ADD,  JMP_N,    MDU_X,      LSU_AMOADD,  MEM_WORD,  CSR_N,  SYS_N,      RS_RF,   RS_ZERO, Y, IMM_X, Y),

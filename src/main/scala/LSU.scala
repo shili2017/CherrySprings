@@ -27,6 +27,9 @@ class LSU(implicit p: Parameters) extends CherrySpringsModule {
   val is_mem   = io.is_mem
   val is_store = io.is_store
   val is_amo   = io.is_amo
+  val is_lr    = uop.lsu_op === s"b$LSU_LR".U
+  val is_sc    = uop.lsu_op === s"b$LSU_SC".U
+  val is_ldu   = uop.lsu_op === s"b$LSU_LDU".U
 
   val s_idle :: s_req :: s_resp :: s1      = Enum(7)
   val s_amo_ld_req :: s_amo_ld_resp :: s2  = s1
@@ -57,12 +60,13 @@ class LSU(implicit p: Parameters) extends CherrySpringsModule {
     )
   }
 
-  val resp_data   = resp.bits.rdata >> (addr_offset << 3)
-  val ld_out      = Wire(UInt(xLen.W))
-  val ldu_out     = Wire(UInt(xLen.W))
-  val ld_out_amo  = RegInit(0.U(xLen.W))
-  val st_data     = (io.wdata << (addr_offset << 3))(xLen - 1, 0)
-  val st_data_amo = Wire(UInt(xLen.W))
+  val resp_data       = resp.bits.rdata >> (addr_offset << 3)
+  val ld_out          = Wire(UInt(xLen.W))
+  val ldu_out         = Wire(UInt(xLen.W))
+  val ld_out_amo      = RegInit(0.U(xLen.W))
+  val st_data         = (io.wdata << (addr_offset << 3))(xLen - 1, 0)
+  val st_data_amo_raw = Wire(UInt(xLen.W))
+  val st_data_amo     = (st_data_amo_raw << (addr_offset << 3))(xLen - 1, 0)
 
   req.bits.addr  := io.addr
   req.bits.wdata := Mux(state === s_req, st_data, st_data_amo)
@@ -71,10 +75,27 @@ class LSU(implicit p: Parameters) extends CherrySpringsModule {
   req.valid      := state === s_req || state === s_amo_ld_req || state === s_amo_st_req
   resp.ready     := state === s_resp || state === s_amo_ld_resp || state === s_amo_st_resp
 
+  val lrsc_reserved = RegInit(false.B)
+  val lrsc_addr     = RegInit(0.U(xLen.W))
+  val sc_succeed    = is_sc && lrsc_reserved && (lrsc_addr === io.addr)
+  val sc_completed  = is_sc && Mux(sc_succeed, resp.fire, state === s_resp)
+
+  when(req.fire && is_lr) {
+    lrsc_reserved := true.B
+    lrsc_addr     := req.bits.addr
+  }
+  when(is_sc && sc_completed) {
+    lrsc_reserved := false.B
+  }
+
   switch(state) {
     is(s_idle) {
       when(is_mem) {
-        state := Mux(is_amo, s_amo_ld_req, s_req)
+        when(is_sc) {
+          state := Mux(sc_succeed, s_req, s_resp)
+        }.otherwise {
+          state := Mux(is_amo, s_amo_ld_req, s_req)
+        }
       }
     }
     is(s_req) {
@@ -83,7 +104,7 @@ class LSU(implicit p: Parameters) extends CherrySpringsModule {
       }
     }
     is(s_resp) {
-      when(resp.fire) {
+      when(resp.fire || sc_completed) {
         state := s_idle
       }
     }
@@ -156,7 +177,7 @@ class LSU(implicit p: Parameters) extends CherrySpringsModule {
   }
 
   // todo: optimize this logic
-  st_data_amo := MuxLookup(
+  st_data_amo_raw := MuxLookup(
     uop.lsu_op,
     0.U,
     Array(
@@ -172,8 +193,8 @@ class LSU(implicit p: Parameters) extends CherrySpringsModule {
     )
   )
 
-  io.rdata := Mux(is_amo, ld_out_amo, Mux(uop.lsu_op === s"b$LSU_LDU".U, ldu_out, ld_out))
-  io.valid := (state === s_resp || state === s_amo_st_resp) && resp.fire // assert for only 1 cycle
+  io.rdata := Mux(is_sc, (!sc_succeed).asUInt, Mux(is_amo, ld_out_amo, Mux(is_ldu, ldu_out, ld_out)))
+  io.valid := (state === s_resp || state === s_amo_st_resp) && resp.fire || sc_completed // assert for only 1 cycle
   io.ready := ((state === s_idle) && !is_mem) || io.valid
 
   if (debugLoadStore) {
