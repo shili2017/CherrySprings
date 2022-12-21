@@ -122,5 +122,31 @@ class DiplomacyToAXI4Bridge(implicit p: Parameters) extends LazyModule {
     axi.r.bits.id   := io.axi4.rid
     axi.r.valid     := io.axi4.rvalid
     io.axi4.rready  := axi.r.ready
+
+    when(axi.aw.fire) {
+      printf("%d: [AXI4-AW] ", DebugTimer())
+      printf(axi.aw.toPrintable)
+      printf("\n")
+    }
+    when(axi.w.fire) {
+      printf("%d: [AXI4-W ] ", DebugTimer())
+      printf(axi.w.toPrintable)
+      printf("\n")
+    }
+    when(axi.b.fire) {
+      printf("%d: [AXI4-B ] ", DebugTimer())
+      printf(axi.b.toPrintable)
+      printf("\n")
+    }
+    when(axi.ar.fire) {
+      printf("%d: [AXI4-AR] ", DebugTimer())
+      printf(axi.ar.toPrintable)
+      printf("\n")
+    }
+    when(axi.r.fire) {
+      printf("%d: [AXI4-R ] ", DebugTimer())
+      printf(axi.r.toPrintable)
+      printf("\n")
+    }
   }
 }
