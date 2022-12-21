@@ -19,6 +19,7 @@ class SimTop(implicit p: Parameters) extends LazyModule {
   xbar.node := bridge_dptw.node
 
   (mem.node
+    := AXI4UserYanker()
     := AXI4Deinterleaver(32)
     := TLToAXI4()
     := xbar.node)
