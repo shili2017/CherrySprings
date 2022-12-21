@@ -12,6 +12,8 @@ object PRV {
 
 // Based on RISC-V ISA Volume II: Privileged Architecture, Version 20211203
 class CSR(implicit p: Parameters) extends CherrySpringsModule {
+  require(xLen == 64)
+
   val io = IO(new Bundle {
     val uop = Input(new MicroOp)
     val rw = new Bundle {
@@ -20,9 +22,15 @@ class CSR(implicit p: Parameters) extends CherrySpringsModule {
       val wdata = Input(UInt(xLen.W))
       val rdata = Output(UInt(xLen.W))
     }
+    val prv        = Output(UInt(2.W))
+    val sv39_en    = Output(Bool())
+    val satp_ppn   = Output(UInt(44.W))
     val fence_i    = Output(Bool())
     val jmp_packet = Output(new JmpPacket)
   })
+
+  // privilege mode
+  val prv = RegInit(PRV.M.U)
 
   val rdata = WireDefault(0.U(xLen.W))
   val wdata = Wire(UInt(xLen.W))
@@ -146,13 +154,20 @@ class CSR(implicit p: Parameters) extends CherrySpringsModule {
    * Name:        satp
    * Description: Supervisor address translation and protection
    */
-  val satp = RegInit(0.U(xLen.W))
+  val satp              = RegInit(0.U(xLen.W))
+  val satp_mode_updated = WireDefault(false.B)
   when(io.rw.addr === 0x180.U) {
     rdata := satp
     when(wen) {
       satp := wdata
+      when(satp(63, 60) =/= wdata(63, 60)) {
+        // refresh pipeline after satp mode is updated if not in M mode
+        satp_mode_updated := (prv =/= PRV.M.U)
+      }
     }
   }
+  io.sv39_en  := (satp(63, 60) === 8.U)
+  io.satp_ppn := satp(43, 0)
 
   /*
    * Number:      0xF14
@@ -310,8 +325,7 @@ class CSR(implicit p: Parameters) extends CherrySpringsModule {
   }
 
   io.rw.rdata := rdata
-
-  val mode = RegInit(PRV.M.U)
+  io.prv      := prv
 
   /*
    * An MRET or SRET instruction is used to return from a trap in M-mode or S-mode respectively.
@@ -323,7 +337,7 @@ class CSR(implicit p: Parameters) extends CherrySpringsModule {
   val is_sret = io.uop.sys_op === s"b$SYS_SRET".U
 
   when(is_mret) {
-    mode         := mstatus_mpp
+    prv          := mstatus_mpp
     mstatus_mie  := mstatus_mpie
     mstatus_mpie := 1.U
     mstatus_mpp  := PRV.U.U
@@ -333,7 +347,7 @@ class CSR(implicit p: Parameters) extends CherrySpringsModule {
   }
 
   when(is_sret) {
-    mode         := mstatus_spp
+    prv          := mstatus_spp
     mstatus_sie  := mstatus_spie
     mstatus_spie := 1.U
     mstatus_spp  := PRV.U.U
@@ -346,14 +360,14 @@ class CSR(implicit p: Parameters) extends CherrySpringsModule {
 
   io.fence_i := io.uop.sys_op === s"b$SYS_FENCEI".U
 
-  io.jmp_packet.valid  := io.fence_i || is_mret || is_sret
-  io.jmp_packet.target := Mux(io.fence_i, io.uop.npc, Mux(is_mret, mepc, sepc))
+  io.jmp_packet.valid  := io.fence_i || satp_mode_updated || is_mret || is_sret
+  io.jmp_packet.target := Mux(io.fence_i || satp_mode_updated, io.uop.npc, Mux(is_mret, mepc, sepc))
 
   if (enableDifftest) {
     val diff_cs = Module(new DifftestCSRState)
     diff_cs.io.clock          := clock
     diff_cs.io.coreid         := hartID.U
-    diff_cs.io.priviledgeMode := mode
+    diff_cs.io.priviledgeMode := prv
     diff_cs.io.mstatus        := mstatus
     diff_cs.io.sstatus        := sstatus
     diff_cs.io.mepc           := mepc
