@@ -15,10 +15,8 @@ class CachePortProxy(implicit p: Parameters) extends CherrySpringsModule {
     val ptw      = new CachePortIO
   })
 
-  io.in.resp <> io.out.resp
-
   val s_in_req :: s_ptw_req :: s_ptw_resp :: s_out_req :: Nil = Enum(4)
-  val state                                                   = RegInit(s_in_req)
+  val state_req                                               = RegInit(s_in_req)
 
   val in_req_bits = RegInit(0.U.asTypeOf(new CachePortReq))
   when(io.in.req.fire) {
@@ -26,42 +24,70 @@ class CachePortProxy(implicit p: Parameters) extends CherrySpringsModule {
   }
 
   val ptw = Module(new PTW)
-  ptw.io.satp_ppn   := io.satp_ppn
-  ptw.io.ptw        <> io.ptw
-  ptw.io.req.bits   := in_req_bits.addr
-  ptw.io.req.valid  := (state === s_ptw_req)
-  ptw.io.resp.ready := (state === s_ptw_resp)
+  ptw.io.satp_ppn                  := io.satp_ppn
+  ptw.io.ptw                       <> io.ptw
+  ptw.io.addr_trans.req.bits.vaddr := in_req_bits.addr
+  ptw.io.addr_trans.req.valid      := (state_req === s_ptw_req)
+  ptw.io.addr_trans.resp.ready     := (state_req === s_ptw_resp)
 
   val need_translation = (io.prv =/= PRV.M.U) && io.sv39_en
 
-  switch(state) {
+  switch(state_req) {
     is(s_in_req) {
       when(io.in.req.fire) {
-        state := Mux(need_translation, s_ptw_req, s_out_req)
+        state_req := Mux(need_translation, s_ptw_req, s_out_req)
       }
     }
     is(s_ptw_req) {
-      when(ptw.io.req.fire) {
-        state := s_ptw_resp
+      when(ptw.io.addr_trans.req.fire) {
+        state_req := s_ptw_resp
       }
     }
     is(s_ptw_resp) {
-      when(ptw.io.resp.fire) {
-        state := s_out_req
+      when(ptw.io.addr_trans.resp.fire) {
+        state_req := Mux(ptw.io.addr_trans.resp.bits.page_fault, s_in_req, s_out_req)
       }
     }
     is(s_out_req) {
       when(io.out.req.fire) {
-        state := s_in_req
+        state_req := s_in_req
       }
     }
   }
 
-  val paddr = RegEnable(ptw.io.resp.bits, 0.U, ptw.io.resp.fire)
-  io.in.req.ready  := (state === s_in_req)
-  io.out.req.valid := (state === s_out_req)
+  val paddr      = RegEnable(ptw.io.addr_trans.resp.bits.paddr, 0.U, ptw.io.addr_trans.resp.fire)
+  val page_fault = ptw.io.addr_trans.resp.bits.page_fault && ptw.io.addr_trans.resp.fire
+  io.in.req.ready  := (state_req === s_in_req)
+  io.out.req.valid := (state_req === s_out_req)
   io.out.req.bits  := in_req_bits
   when(need_translation) {
     io.out.req.bits.addr := paddr
   }
+
+  val s_in_resp :: s_out_resp :: Nil = Enum(2)
+  val state_resp                     = RegInit(s_out_resp)
+
+  val out_resp_bits = RegInit(0.U.asTypeOf(new CachePortResp))
+  when(io.out.resp.fire) {
+    out_resp_bits := io.out.resp.bits
+  }
+
+  val page_fault_r = BoolStopWatch(page_fault, io.in.resp.fire)
+
+  switch(state_resp) {
+    is(s_out_resp) {
+      when(io.out.resp.fire || page_fault) {
+        state_resp := s_in_resp
+      }
+    }
+    is(s_in_resp) {
+      when(io.in.resp.fire) {
+        state_resp := s_out_resp
+      }
+    }
+  }
+  io.in.resp.bits            := out_resp_bits
+  io.in.resp.bits.page_fault := page_fault_r
+  io.in.resp.valid           := (state_resp === s_in_resp)
+  io.out.resp.ready          := (state_resp === s_out_resp)
 }

@@ -149,6 +149,20 @@ class CSR(implicit p: Parameters) extends CherrySpringsModule {
   }
 
   /*
+   * Number:      0x143
+   * Privilege:   SRW
+   * Name:        stval
+   * Description: Supervisor bad address or instruction
+   */
+  val stval = RegInit(0.U(xLen.W))
+  when(io.rw.addr === 0x143.U) {
+    rdata := stval
+    when(wen) {
+      stval := wdata
+    }
+  }
+
+  /*
    * Number:      0x180
    * Privilege:   SRW
    * Name:        satp
@@ -324,6 +338,20 @@ class CSR(implicit p: Parameters) extends CherrySpringsModule {
     }
   }
 
+  /*
+   * Number:      0x343
+   * Privilege:   MRW
+   * Name:        mtval
+   * Description: Machine bad address or instruction
+   */
+  val mtval = RegInit(0.U(xLen.W))
+  when(io.rw.addr === 0x343.U) {
+    rdata := mtval
+    when(wen) {
+      mtval := wdata
+    }
+  }
+
   io.rw.rdata := rdata
   io.prv      := prv
 
@@ -356,12 +384,32 @@ class CSR(implicit p: Parameters) extends CherrySpringsModule {
     }
     sstatus_sie  := sstatus_spie
     sstatus_spie := 1.U
+    printf("%d [SRET] old_prv=%d new_prv=%d\n", DebugTimer(), prv, mstatus_spp)
+  }
+
+  /*
+   * Exception
+   */
+  val is_exc = io.uop.exception =/= s"b$EXC_N".U
+  when(prv === PRV.U.U && io.uop.exception === s"b$EXC_IPF".U) {
+    sepc         := io.uop.pc
+    scause       := 12.U
+    stval        := io.uop.pc
+    sstatus_spie := sstatus_sie
+    sstatus_sie  := 0.U
+    mstatus_spie := mstatus_sie
+    mstatus_sie  := 0.U
+    prv          := PRV.S.U
   }
 
   io.fence_i := io.uop.sys_op === s"b$SYS_FENCEI".U
 
-  io.jmp_packet.valid  := io.fence_i || satp_mode_updated || is_mret || is_sret
-  io.jmp_packet.target := Mux(io.fence_i || satp_mode_updated, io.uop.npc, Mux(is_mret, mepc, sepc))
+  io.jmp_packet.valid := is_exc || io.fence_i || satp_mode_updated || is_mret || is_sret
+  io.jmp_packet.target := Mux(
+    is_exc,
+    Mux(prv === PRV.U.U, stvec, mtvec),
+    Mux(io.fence_i || satp_mode_updated, io.uop.npc, Mux(is_mret, mepc, sepc))
+  )
 
   if (enableDifftest) {
     val diff_cs = Module(new DifftestCSRState)
@@ -372,8 +420,8 @@ class CSR(implicit p: Parameters) extends CherrySpringsModule {
     diff_cs.io.sstatus        := sstatus
     diff_cs.io.mepc           := mepc
     diff_cs.io.sepc           := sepc
-    diff_cs.io.mtval          := 0.U
-    diff_cs.io.stval          := 0.U
+    diff_cs.io.mtval          := mtval
+    diff_cs.io.stval          := stval
     diff_cs.io.mtvec          := mtvec
     diff_cs.io.stvec          := stvec
     diff_cs.io.mcause         := mcause
@@ -385,5 +433,13 @@ class CSR(implicit p: Parameters) extends CherrySpringsModule {
     diff_cs.io.sscratch       := sscratch
     diff_cs.io.mideleg        := mideleg
     diff_cs.io.medeleg        := medeleg
+
+    val diff_ae = Module(new DifftestArchEvent)
+    diff_ae.io.clock         := clock
+    diff_ae.io.coreid        := hartID.U
+    diff_ae.io.intrNO        := 0.U
+    diff_ae.io.cause         := RegNext(Mux(is_exc, 12.U, 0.U))
+    diff_ae.io.exceptionPC   := RegNext(io.uop.pc)
+    diff_ae.io.exceptionInst := 0.U
   }
 }

@@ -2,6 +2,14 @@ trait Constant {
   val Y = "1"
   val N = "0"
 
+  val EXC_X   = "???"
+  val EXC_N   = "000"
+  val EXC_IAM = "001" // Instruction address misaligned (0)
+  val EXC_IAF = "010" // Instruction access fault (1)
+  val EXC_IPF = "011" // Instruction page fault (12)
+  val EXC_II  = "100" // Illegal instruction (2)
+  val EXC_EC  = "101" // Environment call from U/S/M-mode (8, 9, 11)
+
   val FU_X   = "???"
   val FU_ALU = "000"
   val FU_JMP = "001"
@@ -73,11 +81,11 @@ trait Constant {
 
   val SYS_X      = "???"
   val SYS_N      = "000"
-  val SYS_ECALL  = "001"
-  val SYS_MRET   = "010"
-  val SYS_SRET   = "011"
+  val SYS_MRET   = "001"
+  val SYS_SRET   = "010"
   val SYS_FENCE  = "100"
   val SYS_FENCEI = "101"
+  val SYS_SFV    = "110" // sfence.vma
 
   val RS_X    = "??"
   val RS_ZERO = "00"

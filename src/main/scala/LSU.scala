@@ -11,15 +11,13 @@ class LSU(implicit p: Parameters) extends CherrySpringsModule {
     val is_mem   = Input(Bool())
     val is_store = Input(Bool())
     val is_amo   = Input(Bool())
-    val addr     = Input(UInt(32.W))
+    val addr     = Input(UInt(xLen.W))
     val wdata    = Input(UInt(xLen.W))
     val rdata    = Output(UInt(xLen.W))
     val valid    = Output(Bool())
     val dmem     = new CachePortIO
     val ready    = Output(Bool())
   })
-
-  // todo: implement lr/sc
 
   val uop      = io.uop
   val req      = io.dmem.req

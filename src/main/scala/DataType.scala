@@ -3,9 +3,10 @@ import chisel3.util._
 import chipsalliance.rocketchip.config._
 
 class FDPacket(implicit p: Parameters) extends CherrySpringsBundle {
-  val pc    = UInt(32.W)
-  val instr = UInt(32.W)
-  val valid = Bool()
+  val pc         = UInt(xLen.W)
+  val instr      = UInt(32.W)
+  val valid      = Bool()
+  val page_fault = Bool()
 }
 
 class DXPacket(implicit p: Parameters) extends CherrySpringsBundle {
@@ -41,5 +42,5 @@ class PipelineReg[T <: Bundle](packet: T)(implicit p: Parameters) extends Cherry
 
 class JmpPacket(implicit p: Parameters) extends CherrySpringsBundle {
   val valid  = Bool()
-  val target = UInt(32.W)
+  val target = UInt(xLen.W)
 }

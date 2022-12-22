@@ -84,7 +84,7 @@ class Core(implicit p: Parameters) extends CherrySpringsModule {
   )
   alu_jmp_packet.target := Mux(
     alu.io.uop.jmp_op === s"b$JMP_BR".U,
-    id_ex.io.out.uop.pc + id_ex.io.out.uop.imm,
+    id_ex.io.out.uop.pc + SignExt32_64(id_ex.io.out.uop.imm),
     alu.io.adder_out
   )
 
@@ -300,13 +300,5 @@ class Core(implicit p: Parameters) extends CherrySpringsModule {
     diff_te.io.hasWFI   := false.B
     diff_te.io.code     := rf_a0(2, 0)
     diff_te.io.pc       := commit_uop.pc
-
-    val diff_ae = Module(new DifftestArchEvent)
-    diff_ae.io.clock         := clock
-    diff_ae.io.coreid        := hartID.U
-    diff_ae.io.intrNO        := 0.U
-    diff_ae.io.cause         := 0.U
-    diff_ae.io.exceptionPC   := 0.U
-    diff_ae.io.exceptionInst := 0.U
   }
 }

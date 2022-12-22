@@ -1,6 +1,7 @@
 import chisel3._
 import chisel3.util.experimental.decode._
 import chipsalliance.rocketchip.config._
+import Constant._
 
 class Decode(implicit p: Parameters) extends CherrySpringsModule {
   val io = IO(new Bundle {
@@ -21,6 +22,11 @@ class Decode(implicit p: Parameters) extends CherrySpringsModule {
   val decode_result = decoder(minimizer = EspressoMinimizer, input = instr, truthTable = DecodeTable.decode_table)
 
   uop.from_decoder(decode_result)
+
+  when(io.in.valid && io.in.page_fault) {
+    uop.exception := s"b$EXC_IPF".U
+    uop.valid     := false.B
+  }
 
   io.out := Mux(io.in.valid, uop, 0.U.asTypeOf(new MicroOp))
 }

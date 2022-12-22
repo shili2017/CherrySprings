@@ -10,7 +10,8 @@ class CachePortReq(implicit p: Parameters) extends CherrySpringsBundle {
 }
 
 class CachePortResp(implicit p: Parameters) extends CherrySpringsBundle {
-  val rdata = Output(UInt(xLen.W))
+  val rdata      = Output(UInt(xLen.W))
+  val page_fault = Output(Bool())
 }
 
 class CachePortIO(implicit p: Parameters) extends CherrySpringsBundle {
