@@ -266,12 +266,13 @@ class Core(implicit p: Parameters) extends CherrySpringsModule {
     if (debugCommit) {
       when(commit_uop.valid) {
         printf(
-          "%d [COMMIT] pc=%x instr=%x wen=%x wdest=%d\n",
+          "%d [COMMIT] pc=%x instr=%x wen=%x wdest=%d prv=%d\n",
           DebugTimer(),
           commit_uop.pc,
           commit_uop.instr,
           commit_uop.rd_wen,
-          commit_uop.rd_index
+          commit_uop.rd_index,
+          prv
         )
       }
     }

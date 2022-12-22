@@ -35,6 +35,8 @@ class PTW(implicit p: Parameters) extends CherrySpringsModule {
   val pt_rdata   = RegInit(0.U(xLen.W))
   val pte_valid  = io.ptw.resp.bits.rdata(0)
   val pte_xwr    = io.ptw.resp.bits.rdata(4, 2)
+  val pte_a      = io.ptw.resp.bits.rdata(6)
+  val is_leaf    = pte_valid && (pte_xwr =/= 0.U)
   val page_fault = RegInit(false.B)
 
   assert(pt_level < PageTableLevels.U)
@@ -52,7 +54,7 @@ class PTW(implicit p: Parameters) extends CherrySpringsModule {
     }
     is(s_ptw_resp) {
       when(io.ptw.resp.fire) {
-        when(!pte_valid || (pte_valid && (pte_xwr =/= 0.U))) {
+        when(!pte_valid || is_leaf) {
           state := s_resp
         }.otherwise {
           state    := s_ptw_req
@@ -75,7 +77,7 @@ class PTW(implicit p: Parameters) extends CherrySpringsModule {
 
   when(io.ptw.resp.fire) {
     pt_rdata := io.ptw.resp.bits.rdata
-    when(!pte_valid) {
+    when(!pte_valid || (is_leaf && !pte_a)) {
       page_fault := true.B
     }
   }

@@ -402,6 +402,14 @@ class CSR(implicit p: Parameters) extends CherrySpringsModule {
     prv          := PRV.S.U
   }
 
+  // todo: this is temporary, fix it later
+  when(io.rw.addr === 0x100.U || io.rw.addr === 0x300.U) {
+    when(wen) {
+      mstatus_sum := wdata(18)
+      sstatus_sum := wdata(18)
+    }
+  }
+
   io.fence_i := io.uop.sys_op === s"b$SYS_FENCEI".U
 
   io.jmp_packet.valid := is_exc || io.fence_i || satp_mode_updated || is_mret || is_sret
