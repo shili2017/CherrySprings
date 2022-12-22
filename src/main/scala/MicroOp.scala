@@ -1,13 +1,14 @@
 import chisel3._
 import chisel3.util._
 import Constant._
+import chipsalliance.rocketchip.config._
 
-class MicroOp extends Bundle {
-  val valid   = Bool()
-  val illegal = Bool()
+class MicroOp(implicit p: Parameters) extends CherrySpringsBundle {
+  val valid     = Bool()
+  val exception = UInt(EXC_X.length.W)
 
-  val pc    = UInt(32.W)
-  val npc   = UInt(32.W)
+  val pc    = UInt(xLen.W)
+  val npc   = UInt(xLen.W)
   val instr = UInt(32.W)
 
   val fu      = UInt(FU_X.length.W)
@@ -33,7 +34,7 @@ class MicroOp extends Bundle {
     val imm_type = WireInit(0.U(IMM_X.length.W))
     val entries = Seq(
       valid,
-      illegal,
+      exception,
       fu,
       alu_op,
       jmp_op,

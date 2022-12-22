@@ -9,11 +9,17 @@ class Core(implicit p: Parameters) extends CherrySpringsModule {
   val io = IO(new Bundle {
     val imem    = new CachePortIO
     val dmem    = new CachePortIO
+    val iptw    = new CachePortIO
+    val dptw    = new CachePortIO
     val fence_i = Output(Bool())
   })
 
   def isAmo(lsu_op:   UInt) = lsu_op(4).asBool
   def isStore(lsu_op: UInt) = lsu_op === s"b$LSU_ST".U || lsu_op === s"b$LSU_SC".U
+
+  val prv      = Wire(UInt(2.W))
+  val sv39_en  = Wire(Bool())
+  val satp_ppn = Wire(UInt(44.W))
 
   val stall_b         = Wire(Bool())
   val flush_until_ex  = Wire(Bool())
@@ -22,9 +28,15 @@ class Core(implicit p: Parameters) extends CherrySpringsModule {
   /* ----- Stage 1 - Instruction Fetch (IF) -------- */
 
   val ifu            = Module(new IFU)
+  val imem_proxy     = Module(new CachePortProxy)
   val alu_jmp_packet = Wire(new JmpPacket) // from EX stage
   val sys_jmp_packet = Wire(new JmpPacket) // from MEM stage
-  ifu.io.imem              <> io.imem
+  imem_proxy.io.in         <> ifu.io.imem
+  imem_proxy.io.out        <> io.imem
+  imem_proxy.io.ptw        <> io.iptw
+  imem_proxy.io.prv        := prv
+  imem_proxy.io.sv39_en    := sv39_en
+  imem_proxy.io.satp_ppn   := satp_ppn
   ifu.io.out_ready         := stall_b
   ifu.io.jmp_packet.valid  := alu_jmp_packet.valid || sys_jmp_packet.valid
   ifu.io.jmp_packet.target := Mux(sys_jmp_packet.valid, sys_jmp_packet.target, alu_jmp_packet.target)
@@ -72,7 +84,7 @@ class Core(implicit p: Parameters) extends CherrySpringsModule {
   )
   alu_jmp_packet.target := Mux(
     alu.io.uop.jmp_op === s"b$JMP_BR".U,
-    id_ex.io.out.uop.pc + id_ex.io.out.uop.imm,
+    id_ex.io.out.uop.pc + SignExt32_64(id_ex.io.out.uop.imm),
     alu.io.adder_out
   )
 
@@ -96,14 +108,20 @@ class Core(implicit p: Parameters) extends CherrySpringsModule {
   val is_store = isStore(ex_mem.io.out.uop.lsu_op)
   val is_amo   = isAmo(ex_mem.io.out.uop.lsu_op)
 
-  val lsu = Module(new LSU)
-  lsu.io.uop      := ex_mem.io.out.uop
-  lsu.io.is_mem   := is_mem
-  lsu.io.is_store := is_store
-  lsu.io.is_amo   := is_amo
-  lsu.io.addr     := ex_mem.io.out.rd_data
-  lsu.io.wdata    := ex_mem.io.out.rs2_data_from_rf
-  lsu.io.dmem     <> io.dmem
+  val lsu        = Module(new LSU)
+  val dmem_proxy = Module(new CachePortProxy)
+  lsu.io.uop             := ex_mem.io.out.uop
+  lsu.io.is_mem          := is_mem
+  lsu.io.is_store        := is_store
+  lsu.io.is_amo          := is_amo
+  lsu.io.addr            := ex_mem.io.out.rd_data
+  lsu.io.wdata           := ex_mem.io.out.rs2_data_from_rf
+  dmem_proxy.io.in       <> lsu.io.dmem
+  dmem_proxy.io.out      <> io.dmem
+  dmem_proxy.io.ptw      <> io.dptw
+  dmem_proxy.io.prv      := prv
+  dmem_proxy.io.sv39_en  := sv39_en
+  dmem_proxy.io.satp_ppn := satp_ppn
 
   val mdu = Module(new MDU)
   mdu.io.uop    := ex_mem.io.out.uop
@@ -117,6 +135,9 @@ class Core(implicit p: Parameters) extends CherrySpringsModule {
   csr.io.rw.cmd   := ex_mem.io.out.uop.csr_op
   csr.io.rw.wdata := ex_mem.io.out.rs1_data
   sys_jmp_packet  := csr.io.jmp_packet
+  prv             := csr.io.prv
+  sv39_en         := csr.io.sv39_en
+  satp_ppn        := csr.io.satp_ppn
 
   io.fence_i := csr.io.fence_i
 
@@ -279,13 +300,5 @@ class Core(implicit p: Parameters) extends CherrySpringsModule {
     diff_te.io.hasWFI   := false.B
     diff_te.io.code     := rf_a0(2, 0)
     diff_te.io.pc       := commit_uop.pc
-
-    val diff_ae = Module(new DifftestArchEvent)
-    diff_ae.io.clock         := clock
-    diff_ae.io.coreid        := hartID.U
-    diff_ae.io.intrNO        := 0.U
-    diff_ae.io.cause         := 0.U
-    diff_ae.io.exceptionPC   := 0.U
-    diff_ae.io.exceptionInst := 0.U
   }
 }

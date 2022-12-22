@@ -14,10 +14,10 @@ class ICache(source: Int, size: Int)(implicit p: Parameters) extends LazyModule 
         clients = Seq(
           TLMasterParameters.v1(
             name            = s"InstructionCache$source",
-            sourceId        = IdRange(0, 7),
-            supportsProbe   = TransferSizes(32),
-            supportsGet     = TransferSizes(32),
-            supportsPutFull = TransferSizes(32)
+            sourceId        = IdRange(source, source + 1),
+            supportsProbe   = TransferSizes(xLen),
+            supportsGet     = TransferSizes(xLen),
+            supportsPutFull = TransferSizes(xLen)
           )
         )
       )
@@ -114,11 +114,12 @@ class ICache(source: Int, size: Int)(implicit p: Parameters) extends LazyModule 
       tag(getIndex(addr_r))   := getTag(addr_r)
     }
 
-    req.ready       := state === s_check
-    tl.a.valid      := state === s_req
-    tl.a.bits       := get_bits
-    tl.d.ready      := state === s_resp
-    resp.valid      := state === s_ok
-    resp.bits.rdata := Mux(hit_r, data_from_cache, data_from_memory)
+    req.ready            := state === s_check
+    tl.a.valid           := state === s_req
+    tl.a.bits            := get_bits
+    tl.d.ready           := state === s_resp
+    resp.valid           := state === s_ok
+    resp.bits.rdata      := Mux(hit_r, data_from_cache, data_from_memory)
+    resp.bits.page_fault := false.B
   }
 }

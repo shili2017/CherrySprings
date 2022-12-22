@@ -16,7 +16,7 @@ class CachePortToTileLinkBridge(source: Int)(implicit p: Parameters)
         clients = Seq(
           TLMasterParameters.v1(
             name     = s"CachePort$source",
-            sourceId = IdRange(0, 7)
+            sourceId = IdRange(source, source + 1)
           )
         )
       )
@@ -45,12 +45,13 @@ class CachePortToTileLinkBridge(source: Int)(implicit p: Parameters)
     val (_, get_bits) = edge.Get(source.U, req_addr, 3.U)
     val (_, put_bits) = edge.Put(source.U, req_addr, 3.U, req_wdata, req_wmask)
 
-    tl.a.bits       := Mux(req.bits.wen, put_bits, get_bits)
-    resp.bits.rdata := tl.d.bits.data
+    tl.a.bits            := Mux(req.bits.wen, put_bits, get_bits)
+    resp.bits.rdata      := tl.d.bits.data
+    resp.bits.page_fault := false.B
   }
 }
 
-class DiplomacyToAXI4Bridge(implicit p: Parameters) extends LazyModule {
+class DiplomacyToAXI4Bridge(implicit p: Parameters) extends LazyModule with HasCherrySpringsParameters {
   val device    = new SimpleDevice("memory", Seq("memory"))
   val beatBytes = 8
   val node = AXI4SlaveNode(
@@ -123,30 +124,22 @@ class DiplomacyToAXI4Bridge(implicit p: Parameters) extends LazyModule {
     axi.r.valid     := io.axi4.rvalid
     io.axi4.rready  := axi.r.ready
 
-    when(axi.aw.fire) {
-      printf("%d: [AXI4-AW] ", DebugTimer())
-      printf(axi.aw.toPrintable)
-      printf("\n")
-    }
-    when(axi.w.fire) {
-      printf("%d: [AXI4-W ] ", DebugTimer())
-      printf(axi.w.toPrintable)
-      printf("\n")
-    }
-    when(axi.b.fire) {
-      printf("%d: [AXI4-B ] ", DebugTimer())
-      printf(axi.b.toPrintable)
-      printf("\n")
-    }
-    when(axi.ar.fire) {
-      printf("%d: [AXI4-AR] ", DebugTimer())
-      printf(axi.ar.toPrintable)
-      printf("\n")
-    }
-    when(axi.r.fire) {
-      printf("%d: [AXI4-R ] ", DebugTimer())
-      printf(axi.r.toPrintable)
-      printf("\n")
+    if (debugAXI4) {
+      when(axi.aw.fire) {
+        printf("%d [AXI4-AW] addr=%x\n", DebugTimer(), axi.aw.bits.addr)
+      }
+      when(axi.w.fire) {
+        printf("%d [AXI4-W ] data=%x strb=%x\n", DebugTimer(), axi.w.bits.data, axi.w.bits.strb)
+      }
+      when(axi.b.fire) {
+        printf("%d [AXI4-B ] resp=%x\n", DebugTimer(), axi.b.bits.resp)
+      }
+      when(axi.ar.fire) {
+        printf("%d [AXI4-AR] addr=%x\n", DebugTimer(), axi.ar.bits.addr)
+      }
+      when(axi.r.fire) {
+        printf("%d [AXI4-R ] data=%x\n", DebugTimer(), axi.r.bits.data)
+      }
     }
   }
 }
