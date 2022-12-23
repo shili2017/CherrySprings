@@ -48,6 +48,7 @@ class PTW(implicit p: Parameters) extends CherrySpringsModule {
   val pte_x      = pte(3)
   val pte_u      = pte(4)
   val pte_a      = pte(6)
+  val pte_d      = pte(7)
   val is_leaf    = pte_v && (pte_r || pte_x)
   val page_fault = RegInit(false.B)
 
@@ -117,6 +118,11 @@ class PTW(implicit p: Parameters) extends CherrySpringsModule {
       //       this is a misaligned superpage, raise page-fault
       when(!pte_a) {
         page_fault := true.B
+      }
+      if (is_dptw) {
+        when(req_wen && !pte_d) {
+          page_fault := true.B
+        }
       }
     }
   }

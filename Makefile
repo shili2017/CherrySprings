@@ -12,10 +12,10 @@ emu: verilog
 	sed -i 's/io_memAXI_0_rdata,/io_memAXI_0_rdata[3:0],/g' ./build/SimTop.v
 	sed -i 's/io_memAXI_0_wdata =/io_memAXI_0_wdata[0] =/g' ./build/SimTop.v
 	sed -i 's/ io_memAXI_0_rdata;/ io_memAXI_0_rdata[0];/g' ./build/SimTop.v
-	cd difftest && $(MAKE) WITH_DRAMSIM3=1 EMU_TRACE=1 WITH_CHISELDB=0 emu -j
+	cd difftest && $(MAKE) EMU_TRACE=1 WITH_CHISELDB=0 emu -j
 
 emu2:
-	cd difftest && $(MAKE) WITH_DRAMSIM3=1 EMU_TRACE=1 WITH_CHISELDB=0 emu -j
+	cd difftest && $(MAKE) EMU_TRACE=1 WITH_CHISELDB=0 emu -j
 
 clean:
 	-rm -rf $(BUILD_DIR)
