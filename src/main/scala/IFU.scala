@@ -20,6 +20,11 @@ class IFU(implicit p: Parameters) extends CherrySpringsModule {
   val s_req :: s_resp :: s_wait :: Nil = Enum(3)
   val state                            = RegInit(s_req)
 
+  val jmp_r = BoolStopWatch(
+    io.jmp_packet.valid && !io.imem.resp.fire && (state =/= s_wait),
+    io.imem.resp.fire
+  )
+
   switch(state) {
     is(s_req) {
       when(io.imem.req.fire) {
@@ -28,7 +33,7 @@ class IFU(implicit p: Parameters) extends CherrySpringsModule {
     }
     is(s_resp) {
       when(io.imem.resp.fire) {
-        state := Mux(io.imem.resp.bits.page_fault, s_wait, s_req)
+        state := Mux(io.imem.resp.bits.page_fault && !jmp_r, s_wait, s_req)
       }
     }
     is(s_wait) {
@@ -37,8 +42,6 @@ class IFU(implicit p: Parameters) extends CherrySpringsModule {
       }
     }
   }
-
-  val jmp_r = BoolStopWatch(io.jmp_packet.valid && !io.imem.resp.fire && (state =/= s_wait), io.imem.resp.fire)
 
   val req_addr = Mux(io.jmp_packet.valid, io.jmp_packet.target, pc)
   io.imem.req.bits      := 0.U.asTypeOf(new CachePortReq)

@@ -3,8 +3,12 @@ import chisel3.util._
 import Constant._
 import chipsalliance.rocketchip.config._
 
+case object IsIPTW extends Field[Boolean]
+case object IsDPTW extends Field[Boolean]
+
 class AddrTransPortReq(implicit p: Parameters) extends CherrySpringsBundle {
   val vaddr = Output(UInt(xLen.W))
+  val wen   = Output(Bool())
 }
 
 class AddrTransPortResp(implicit p: Parameters) extends CherrySpringsBundle {
@@ -20,8 +24,11 @@ class AddrTransPortIO(implicit p: Parameters) extends CherrySpringsBundle {
 class PTW(implicit p: Parameters) extends CherrySpringsModule {
   require(xLen == 64)
   val PageTableLevels = 3
+  val is_iptw         = p(IsIPTW)
+  val is_dptw         = p(IsDPTW)
 
   val io = IO(new Bundle {
+    val prv        = Input(UInt(2.W))
     val satp_ppn   = Input(UInt(44.W))
     val addr_trans = Flipped(new AddrTransPortIO)
     val ptw        = new CachePortIO
@@ -32,11 +39,16 @@ class PTW(implicit p: Parameters) extends CherrySpringsModule {
 
   val pt_level   = RegInit(0.U(2.W))
   val vaddr      = RegInit(0.U(xLen.W))
+  val req_wen    = RegInit(false.B)
   val pt_rdata   = RegInit(0.U(xLen.W))
-  val pte_valid  = io.ptw.resp.bits.rdata(0)
-  val pte_xwr    = io.ptw.resp.bits.rdata(4, 2)
-  val pte_a      = io.ptw.resp.bits.rdata(6)
-  val is_leaf    = pte_valid && (pte_xwr =/= 0.U)
+  val pte        = io.ptw.resp.bits.rdata
+  val pte_v      = pte(0)
+  val pte_r      = pte(1)
+  val pte_w      = pte(2)
+  val pte_x      = pte(3)
+  val pte_u      = pte(4)
+  val pte_a      = pte(6)
+  val is_leaf    = pte_v && (pte_r || pte_x)
   val page_fault = RegInit(false.B)
 
   assert(pt_level < PageTableLevels.U)
@@ -54,7 +66,7 @@ class PTW(implicit p: Parameters) extends CherrySpringsModule {
     }
     is(s_ptw_resp) {
       when(io.ptw.resp.fire) {
-        when(!pte_valid || is_leaf) {
+        when(!pte_v || is_leaf || (pt_level === 0.U)) {
           state := s_resp
         }.otherwise {
           state    := s_ptw_req
@@ -72,13 +84,40 @@ class PTW(implicit p: Parameters) extends CherrySpringsModule {
   when(io.addr_trans.req.fire) {
     pt_level   := (PageTableLevels - 1).U
     vaddr      := io.addr_trans.req.bits.vaddr
+    req_wen    := io.addr_trans.req.bits.wen
     page_fault := false.B
   }
 
   when(io.ptw.resp.fire) {
     pt_rdata := io.ptw.resp.bits.rdata
-    when(!pte_valid || (is_leaf && !pte_a)) {
+    when(!pte_v || (!pte_r && pte_w)) {
       page_fault := true.B
+    }
+    when((pt_level === 0.U) && !pte_r && !pte_x) {
+      page_fault := true.B
+    }
+    when(is_leaf) {
+      when(io.prv === PRV.U.U && !pte_u) {
+        page_fault := true.B
+      }
+      if (is_iptw) {
+        when(!pte_x) {
+          page_fault := true.B
+        }
+      }
+      if (is_dptw) {
+        when(req_wen && !pte_w) {
+          page_fault := true.B
+        }
+        when(!req_wen && !pte_r) {
+          page_fault := true.B
+        }
+      }
+      // todo: if pt_level > 0 and pte.ppn[pt_level-1 : 0] != 0,
+      //       this is a misaligned superpage, raise page-fault
+      when(!pte_a) {
+        page_fault := true.B
+      }
     }
   }
 

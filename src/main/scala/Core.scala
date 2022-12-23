@@ -27,8 +27,11 @@ class Core(implicit p: Parameters) extends CherrySpringsModule {
 
   /* ----- Stage 1 - Instruction Fetch (IF) -------- */
 
-  val ifu            = Module(new IFU)
-  val imem_proxy     = Module(new CachePortProxy)
+  val ifu = Module(new IFU)
+  val imem_proxy = Module(new CachePortProxy()(p.alterPartial({
+    case IsIPTW => true
+    case IsDPTW => false
+  })))
   val alu_jmp_packet = Wire(new JmpPacket) // from EX stage
   val sys_jmp_packet = Wire(new JmpPacket) // from MEM stage
   imem_proxy.io.in         <> ifu.io.imem
@@ -108,8 +111,11 @@ class Core(implicit p: Parameters) extends CherrySpringsModule {
   val is_store = isStore(ex_mem.io.out.uop.lsu_op)
   val is_amo   = isAmo(ex_mem.io.out.uop.lsu_op)
 
-  val lsu        = Module(new LSU)
-  val dmem_proxy = Module(new CachePortProxy)
+  val lsu = Module(new LSU)
+  val dmem_proxy = Module(new CachePortProxy()(p.alterPartial({
+    case IsIPTW => false
+    case IsDPTW => true
+  })))
   lsu.io.uop             := ex_mem.io.out.uop
   lsu.io.is_mem          := is_mem
   lsu.io.is_store        := is_store

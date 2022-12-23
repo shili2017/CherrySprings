@@ -384,7 +384,6 @@ class CSR(implicit p: Parameters) extends CherrySpringsModule {
     }
     sstatus_sie  := sstatus_spie
     sstatus_spie := 1.U
-    printf("%d [SRET] old_prv=%d new_prv=%d\n", DebugTimer(), prv, mstatus_spp)
   }
 
   /*

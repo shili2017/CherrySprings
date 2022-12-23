@@ -24,9 +24,11 @@ class CachePortProxy(implicit p: Parameters) extends CherrySpringsModule {
   }
 
   val ptw = Module(new PTW)
+  ptw.io.prv                       := io.prv
   ptw.io.satp_ppn                  := io.satp_ppn
   ptw.io.ptw                       <> io.ptw
   ptw.io.addr_trans.req.bits.vaddr := in_req_bits.addr
+  ptw.io.addr_trans.req.bits.wen   := in_req_bits.wen
   ptw.io.addr_trans.req.valid      := (state_req === s_ptw_req)
   ptw.io.addr_trans.resp.ready     := (state_req === s_ptw_resp)
 
