@@ -23,6 +23,7 @@ trait HasCherrySpringsParameters {
   def debugCommit:    Boolean = false
   def debugLoadStore: Boolean = false
   def debugPTW:       Boolean = false
+  def debugVirtRam:   Boolean = false
   def debugAXI4:      Boolean = false
   def xLen:           Int     = 64
 }

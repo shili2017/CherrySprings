@@ -82,14 +82,34 @@ class TLVirtualRam(implicit p: Parameters) extends LazyModule with HasCherrySpri
     }
     val vr = Module(new VirtualRam)
     vr.io.clk   := clock
-    vr.io.en    := is_get || is_put
+    vr.io.en    := (is_get || is_put) && tl.d.fire
     vr.io.addr  := req.address(30, 3) + count
     vr.io.wdata := req.data
     vr.io.wmask := req.mask
-    vr.io.wen   := is_put
+    vr.io.wen   := is_put && tl.d.fire
 
     tl.a.ready := (state === s_req)
     tl.d.valid := (state === s_resp)
     tl.d.bits  := Mux(is_put, edge.AccessAck(req), edge.AccessAck(req, vr.io.rdata))
+
+    if (debugVirtRam) {
+      when(tl.a.fire) {
+        printf(
+          "%d [VRAM-A] addr=%x opcode=%x data=%x mask=%x\n",
+          DebugTimer(),
+          tl.a.bits.address,
+          tl.a.bits.opcode,
+          tl.a.bits.data,
+          tl.a.bits.mask
+        )
+      }
+      when(tl.d.fire) {
+        printf(
+          "%d [VRAM-D] data=%x\n",
+          DebugTimer(),
+          tl.d.bits.data
+        )
+      }
+    }
   }
 }
