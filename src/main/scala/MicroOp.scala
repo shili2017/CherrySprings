@@ -4,8 +4,8 @@ import Constant._
 import chipsalliance.rocketchip.config._
 
 class MicroOp(implicit p: Parameters) extends CherrySpringsBundle {
-  val valid     = Bool()
-  val exception = UInt(EXC_X.length.W)
+  val valid = Bool()
+  val exc   = UInt(EXC_X.length.W)
 
   val pc    = UInt(xLen.W)
   val npc   = UInt(xLen.W)
@@ -34,7 +34,7 @@ class MicroOp(implicit p: Parameters) extends CherrySpringsBundle {
     val imm_type = WireInit(0.U(IMM_X.length.W))
     val entries = Seq(
       valid,
-      exception,
+      exc,
       fu,
       alu_op,
       jmp_op,

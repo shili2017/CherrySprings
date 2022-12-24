@@ -15,29 +15,26 @@ class LSU(implicit p: Parameters) extends CherrySpringsModule {
     val wdata    = Input(UInt(xLen.W))
     val rdata    = Output(UInt(xLen.W))
     val valid    = Output(Bool())
+    val exc_code = Output(UInt(4.W))
     val dmem     = new CachePortIO
     val ready    = Output(Bool())
   })
 
-  val uop      = io.uop
-  val req      = io.dmem.req
-  val resp     = io.dmem.resp
-  val is_mem   = io.is_mem
-  val is_store = io.is_store
-  val is_amo   = io.is_amo
-  val is_lr    = uop.lsu_op === s"b$LSU_LR".U
-  val is_sc    = uop.lsu_op === s"b$LSU_SC".U
-  val is_ldu   = uop.lsu_op === s"b$LSU_LDU".U
+  val req    = io.dmem.req
+  val resp   = io.dmem.resp
+  val is_lr  = io.uop.lsu_op === s"b$LSU_LR".U
+  val is_sc  = io.uop.lsu_op === s"b$LSU_SC".U
+  val is_ldu = io.uop.lsu_op === s"b$LSU_LDU".U
 
-  val s_idle :: s_req :: s_resp :: s1      = Enum(7)
-  val s_amo_ld_req :: s_amo_ld_resp :: s2  = s1
-  val s_amo_st_req :: s_amo_st_resp :: Nil = s2
-  val state                                = RegInit(s_idle)
+  val s_idle :: s_req :: s_resp :: s_exc :: s1 = Enum(8)
+  val s_amo_ld_req :: s_amo_ld_resp :: s2      = s1
+  val s_amo_st_req :: s_amo_st_resp :: Nil     = s2
+  val state                                    = RegInit(s_idle)
 
   val addr_offset = if (xLen == 32) io.addr(1, 0) else io.addr(2, 0)
   val wmask = if (xLen == 32) {
     MuxLookup(
-      uop.mem_len,
+      io.uop.mem_len,
       0.U,
       Array(
         s"b$MEM_BYTE".U -> "b0001".U(4.W),
@@ -47,7 +44,7 @@ class LSU(implicit p: Parameters) extends CherrySpringsModule {
     )
   } else {
     MuxLookup(
-      uop.mem_len,
+      io.uop.mem_len,
       0.U,
       Array(
         s"b$MEM_BYTE".U  -> "b00000001".U(8.W),
@@ -59,6 +56,7 @@ class LSU(implicit p: Parameters) extends CherrySpringsModule {
   }
 
   val resp_data       = resp.bits.rdata >> (addr_offset << 3)
+  val resp_page_fault = resp.bits.page_fault
   val ld_out          = Wire(UInt(xLen.W))
   val ldu_out         = Wire(UInt(xLen.W))
   val ld_out_amo      = RegInit(0.U(xLen.W))
@@ -69,7 +67,7 @@ class LSU(implicit p: Parameters) extends CherrySpringsModule {
   req.bits.addr  := io.addr
   req.bits.wdata := Mux(state === s_req, st_data, st_data_amo)
   req.bits.wmask := (wmask << addr_offset)(xLen / 8 - 1, 0)
-  req.bits.wen   := is_store || (state === s_amo_st_req)
+  req.bits.wen   := io.is_store || (state === s_amo_st_req)
   req.valid      := state === s_req || state === s_amo_ld_req || state === s_amo_st_req
   resp.ready     := state === s_resp || state === s_amo_ld_resp || state === s_amo_st_resp
 
@@ -88,11 +86,11 @@ class LSU(implicit p: Parameters) extends CherrySpringsModule {
 
   switch(state) {
     is(s_idle) {
-      when(is_mem) {
+      when(io.is_mem) {
         when(is_sc) {
           state := Mux(sc_succeed, s_req, s_resp)
         }.otherwise {
-          state := Mux(is_amo, s_amo_ld_req, s_req)
+          state := Mux(io.is_amo, s_amo_ld_req, s_req)
         }
       }
     }
@@ -103,7 +101,7 @@ class LSU(implicit p: Parameters) extends CherrySpringsModule {
     }
     is(s_resp) {
       when(resp.fire || sc_completed) {
-        state := s_idle
+        state := Mux(resp_page_fault, s_exc, s_idle)
       }
     }
     is(s_amo_ld_req) {
@@ -113,7 +111,7 @@ class LSU(implicit p: Parameters) extends CherrySpringsModule {
     }
     is(s_amo_ld_resp) {
       when(resp.fire) {
-        state := s_amo_st_req
+        state := Mux(resp_page_fault, s_exc, s_amo_st_req)
       }
     }
     is(s_amo_st_req) {
@@ -126,11 +124,14 @@ class LSU(implicit p: Parameters) extends CherrySpringsModule {
         state := s_idle
       }
     }
+    is(s_exc) {
+      state := s_idle
+    }
   }
 
   if (xLen == 32) {
     ld_out := MuxLookup(
-      uop.mem_len,
+      io.uop.mem_len,
       0.U,
       Array(
         s"b$MEM_BYTE".U -> Cat(Fill(24, resp_data(7)), resp_data(7, 0)),
@@ -140,7 +141,7 @@ class LSU(implicit p: Parameters) extends CherrySpringsModule {
     )
 
     ldu_out := MuxLookup(
-      uop.mem_len,
+      io.uop.mem_len,
       0.U,
       Array(
         s"b$MEM_BYTE".U -> Cat(Fill(24, 0.U), resp_data(7, 0)),
@@ -149,7 +150,7 @@ class LSU(implicit p: Parameters) extends CherrySpringsModule {
     )
   } else {
     ld_out := MuxLookup(
-      uop.mem_len,
+      io.uop.mem_len,
       0.U,
       Array(
         s"b$MEM_BYTE".U  -> Cat(Fill(56, resp_data(7)), resp_data(7, 0)),
@@ -160,7 +161,7 @@ class LSU(implicit p: Parameters) extends CherrySpringsModule {
     )
 
     ldu_out := MuxLookup(
-      uop.mem_len,
+      io.uop.mem_len,
       0.U,
       Array(
         s"b$MEM_BYTE".U -> Cat(Fill(56, 0.U), resp_data(7, 0)),
@@ -176,7 +177,7 @@ class LSU(implicit p: Parameters) extends CherrySpringsModule {
 
   // todo: optimize this logic
   st_data_amo_raw := MuxLookup(
-    uop.lsu_op,
+    io.uop.lsu_op,
     0.U,
     Array(
       s"b$LSU_AMOSWAP".U -> io.wdata,
@@ -191,9 +192,21 @@ class LSU(implicit p: Parameters) extends CherrySpringsModule {
     )
   )
 
-  io.rdata := Mux(is_sc, (!sc_succeed).asUInt, Mux(is_amo, ld_out_amo, Mux(is_ldu, ldu_out, ld_out)))
-  io.valid := (state === s_resp || state === s_amo_st_resp) && resp.fire || sc_completed // assert for only 1 cycle
-  io.ready := ((state === s_idle) && !is_mem) || io.valid
+  io.rdata := Mux(is_sc, (!sc_succeed).asUInt, Mux(io.is_amo, ld_out_amo, Mux(is_ldu, ldu_out, ld_out)))
+  io.valid := (state === s_resp || state === s_amo_st_resp) && (resp.fire && !resp.bits.page_fault) || sc_completed || (state === s_exc) // assert for only 1 cycle
+  io.ready := ((state === s_idle) && !io.is_mem) || io.valid
+
+  /*
+   * exc_code Description
+   *        0 Load/store/AMO instruction is executed without exception (different from ISA, 0 for Instruction address misaligned)
+   *        4 Load address misaligned       (not implemented yet)
+   *        5 Load access fault             (not implemented yet)
+   *        6 Store/AMO address misaligned  (not implemented yet)
+   *        7 Store/AMO access fault        (not implemented yet)
+   *       13 Load page fault
+   *       15 Store/AMO page fault
+   */
+  io.exc_code := Mux(state === s_exc, Mux(io.is_store || io.is_amo, 15.U, 13.U), 0.U)
 
   if (debugLoadStore) {
     when(io.dmem.req.fire) {

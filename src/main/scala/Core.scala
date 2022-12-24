@@ -136,20 +136,26 @@ class Core(implicit p: Parameters) extends CherrySpringsModule {
   mdu.io.in2    := ex_mem.io.out.rs2_data_from_rf
 
   val csr = Module(new CSR)
-  csr.io.uop      := ex_mem.io.out.uop
-  csr.io.rw.addr  := ex_mem.io.out.uop.instr(31, 20)
-  csr.io.rw.cmd   := ex_mem.io.out.uop.csr_op
-  csr.io.rw.wdata := ex_mem.io.out.rs1_data
-  sys_jmp_packet  := csr.io.jmp_packet
-  prv             := csr.io.prv
-  sv39_en         := csr.io.sv39_en
-  satp_ppn        := csr.io.satp_ppn
+  csr.io.uop          := ex_mem.io.out.uop
+  csr.io.rw.addr      := ex_mem.io.out.uop.instr(31, 20)
+  csr.io.rw.cmd       := ex_mem.io.out.uop.csr_op
+  csr.io.rw.wdata     := ex_mem.io.out.rs1_data
+  sys_jmp_packet      := csr.io.jmp_packet
+  prv                 := csr.io.prv
+  sv39_en             := csr.io.sv39_en
+  satp_ppn            := csr.io.satp_ppn
+  csr.io.lsu_addr     := lsu.io.addr
+  csr.io.lsu_exc_code := lsu.io.exc_code
 
   io.fence_i := csr.io.fence_i
 
   val mem_wb = Module(new PipelineReg(new MWPacket))
-  mem_wb.io.in.uop       := ex_mem.io.out.uop
-  mem_wb.io.in.uop.valid := Mux(is_mem, lsu.io.valid, Mux(is_mdu, mdu.io.valid, ex_mem.io.out.uop.valid))
+  mem_wb.io.in.uop := ex_mem.io.out.uop
+  mem_wb.io.in.uop.valid := Mux(
+    is_mem,
+    lsu.io.valid && (lsu.io.exc_code === 0.U),
+    Mux(is_mdu, mdu.io.valid, ex_mem.io.out.uop.valid)
+  )
   mem_wb.io.in.rd_data := MuxLookup(
     ex_mem.io.out.uop.fu,
     ex_mem.io.out.rd_data,

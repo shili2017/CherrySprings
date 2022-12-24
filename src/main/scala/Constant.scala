@@ -2,6 +2,11 @@ trait Constant {
   val Y = "1"
   val N = "0"
 
+  /*
+   * Note:
+   * - Some exceptions are generated in LSU (4, 5, 6, 7, 13, 15)
+   * - Breakpoint (3) not implemented yet
+   */
   val EXC_X   = "???"
   val EXC_N   = "000"
   val EXC_IAM = "001" // Instruction address misaligned (0)

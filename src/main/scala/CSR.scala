@@ -22,11 +22,13 @@ class CSR(implicit p: Parameters) extends CherrySpringsModule {
       val wdata = Input(UInt(xLen.W))
       val rdata = Output(UInt(xLen.W))
     }
-    val prv        = Output(UInt(2.W))
-    val sv39_en    = Output(Bool())
-    val satp_ppn   = Output(UInt(44.W))
-    val fence_i    = Output(Bool())
-    val jmp_packet = Output(new JmpPacket)
+    val prv          = Output(UInt(2.W))
+    val sv39_en      = Output(Bool())
+    val satp_ppn     = Output(UInt(44.W))
+    val fence_i      = Output(Bool())
+    val jmp_packet   = Output(new JmpPacket)
+    val lsu_addr     = Input(UInt(xLen.W))
+    val lsu_exc_code = Input(UInt(4.W))
   })
 
   // privilege mode
@@ -389,11 +391,28 @@ class CSR(implicit p: Parameters) extends CherrySpringsModule {
   /*
    * Exception
    */
-  val is_exc = io.uop.exception =/= s"b$EXC_N".U
-  when(prv === PRV.U.U && io.uop.exception === s"b$EXC_IPF".U) {
+  val is_exc_from_prev = (io.uop.exc =/= s"b$EXC_N".U)
+  val is_exc_from_lsu  = (io.lsu_exc_code =/= 0.U)
+  val is_exc           = is_exc_from_prev || is_exc_from_lsu
+  val cause = Mux(
+    io.lsu_exc_code =/= 0.U,
+    io.lsu_exc_code,
+    MuxLookup(
+      io.uop.exc,
+      0.U,
+      Array(
+        s"b$EXC_IAM".U -> 0.U,
+        s"b$EXC_IAF".U -> 1.U,
+        s"b$EXC_II".U  -> 2.U,
+        s"b$EXC_EC".U  -> Cat("b10".U, prv),
+        s"b$EXC_IPF".U -> 12.U
+      )
+    )
+  )
+  when(prv === PRV.U.U && is_exc) {
     sepc         := io.uop.pc
-    scause       := 12.U
-    stval        := io.uop.pc
+    scause       := cause
+    stval        := Mux(is_exc_from_lsu, io.lsu_addr, io.uop.pc)
     sstatus_spie := sstatus_sie
     sstatus_sie  := 0.U
     mstatus_spie := mstatus_sie
@@ -445,7 +464,7 @@ class CSR(implicit p: Parameters) extends CherrySpringsModule {
     diff_ae.io.clock         := clock
     diff_ae.io.coreid        := hartID.U
     diff_ae.io.intrNO        := 0.U
-    diff_ae.io.cause         := RegNext(Mux(is_exc, 12.U, 0.U))
+    diff_ae.io.cause         := RegNext(Mux(is_exc, cause, 0.U))
     diff_ae.io.exceptionPC   := RegNext(io.uop.pc)
     diff_ae.io.exceptionInst := 0.U
   }
