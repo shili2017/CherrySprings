@@ -121,7 +121,7 @@ class LSU(implicit p: Parameters) extends CherrySpringsModule {
     }
     is(s_amo_st_resp) {
       when(resp.fire) {
-        state := s_idle
+        state := Mux(resp_page_fault, s_exc, s_idle)
       }
     }
     is(s_exc) {
