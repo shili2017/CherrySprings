@@ -7,7 +7,7 @@ class CachePortProxy(implicit p: Parameters) extends CherrySpringsModule {
   require(xLen == 64)
 
   val io = IO(new Bundle {
-    val prv      = Input(UInt(2.W))
+    val prv_mpp  = Input(UInt(2.W))
     val sv39_en  = Input(Bool())
     val satp_ppn = Input(UInt(44.W))
     val in       = Flipped(new CachePortIO)
@@ -24,7 +24,7 @@ class CachePortProxy(implicit p: Parameters) extends CherrySpringsModule {
   }
 
   val ptw = Module(new PTW)
-  ptw.io.prv                       := io.prv
+  ptw.io.prv                       := io.prv_mpp
   ptw.io.satp_ppn                  := io.satp_ppn
   ptw.io.ptw                       <> io.ptw
   ptw.io.addr_trans.req.bits.vaddr := in_req_bits.addr
@@ -32,12 +32,12 @@ class CachePortProxy(implicit p: Parameters) extends CherrySpringsModule {
   ptw.io.addr_trans.req.valid      := (state_req === s_ptw_req)
   ptw.io.addr_trans.resp.ready     := (state_req === s_ptw_resp)
 
-  val need_translation = (io.prv =/= PRV.M.U) && io.sv39_en
+  val ptw_en = (io.prv_mpp =/= PRV.M.U) && io.sv39_en
 
   switch(state_req) {
     is(s_in_req) {
       when(io.in.req.fire) {
-        state_req := Mux(need_translation, s_ptw_req, s_out_req)
+        state_req := Mux(ptw_en, s_ptw_req, s_out_req)
       }
     }
     is(s_ptw_req) {
@@ -62,7 +62,7 @@ class CachePortProxy(implicit p: Parameters) extends CherrySpringsModule {
   io.in.req.ready  := (state_req === s_in_req)
   io.out.req.valid := (state_req === s_out_req)
   io.out.req.bits  := in_req_bits
-  when(need_translation) {
+  when(ptw_en) {
     io.out.req.bits.addr := paddr
   }
 

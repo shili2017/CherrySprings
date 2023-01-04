@@ -37,7 +37,7 @@ class Core(implicit p: Parameters) extends CherrySpringsModule {
   imem_proxy.io.in         <> ifu.io.imem
   imem_proxy.io.out        <> io.imem
   imem_proxy.io.ptw        <> io.iptw
-  imem_proxy.io.prv        := prv
+  imem_proxy.io.prv_mpp    := prv
   imem_proxy.io.sv39_en    := sv39_en
   imem_proxy.io.satp_ppn   := satp_ppn
   ifu.io.out_ready         := stall_b
@@ -116,18 +116,12 @@ class Core(implicit p: Parameters) extends CherrySpringsModule {
     case IsIPTW => false
     case IsDPTW => true
   })))
-  lsu.io.uop             := ex_mem.io.out.uop
-  lsu.io.is_mem          := is_mem
-  lsu.io.is_store        := is_store
-  lsu.io.is_amo          := is_amo
-  lsu.io.addr            := ex_mem.io.out.rd_data
-  lsu.io.wdata           := ex_mem.io.out.rs2_data_from_rf
-  dmem_proxy.io.in       <> lsu.io.dmem
-  dmem_proxy.io.out      <> io.dmem
-  dmem_proxy.io.ptw      <> io.dptw
-  dmem_proxy.io.prv      := prv
-  dmem_proxy.io.sv39_en  := sv39_en
-  dmem_proxy.io.satp_ppn := satp_ppn
+  lsu.io.uop      := ex_mem.io.out.uop
+  lsu.io.is_mem   := is_mem
+  lsu.io.is_store := is_store
+  lsu.io.is_amo   := is_amo
+  lsu.io.addr     := ex_mem.io.out.rd_data
+  lsu.io.wdata    := ex_mem.io.out.rs2_data_from_rf
 
   val mdu = Module(new MDU)
   mdu.io.uop    := ex_mem.io.out.uop
@@ -146,6 +140,13 @@ class Core(implicit p: Parameters) extends CherrySpringsModule {
   satp_ppn            := csr.io.satp_ppn
   csr.io.lsu_addr     := lsu.io.addr
   csr.io.lsu_exc_code := lsu.io.exc_code
+
+  dmem_proxy.io.in       <> lsu.io.dmem
+  dmem_proxy.io.out      <> io.dmem
+  dmem_proxy.io.ptw      <> io.dptw
+  dmem_proxy.io.prv_mpp  := Mux(csr.io.mprv, csr.io.mpp, prv)
+  dmem_proxy.io.sv39_en  := sv39_en
+  dmem_proxy.io.satp_ppn := satp_ppn
 
   io.fence_i := csr.io.fence_i
 

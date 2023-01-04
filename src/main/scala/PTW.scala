@@ -114,8 +114,10 @@ class PTW(implicit p: Parameters) extends CherrySpringsModule {
           page_fault := true.B
         }
       }
-      // todo: if pt_level > 0 and pte.ppn[pt_level-1 : 0] != 0,
-      //       this is a misaligned superpage, raise page-fault
+      // misaligned superpage
+      when((pt_level === 2.U && pte(27, 10) =/= 0.U) || (pt_level === 1.U && pte(18, 10) =/= 0.U)) {
+        page_fault := true.B
+      }
       when(!pte_a) {
         page_fault := true.B
       }

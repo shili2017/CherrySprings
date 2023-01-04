@@ -23,6 +23,8 @@ class CSR(implicit p: Parameters) extends CherrySpringsModule {
       val rdata = Output(UInt(xLen.W))
     }
     val prv          = Output(UInt(2.W))
+    val mprv         = Output(Bool())
+    val mpp          = Output(UInt(2.W))
     val sv39_en      = Output(Bool())
     val satp_ppn     = Output(UInt(44.W))
     val fence_i      = Output(Bool())
@@ -250,11 +252,15 @@ class CSR(implicit p: Parameters) extends CherrySpringsModule {
   when(io.rw.addr === 0x300.U) {
     rdata := mstatus
     when(wen) {
-      mstatus_sie := wdata(1)
-      mstatus_mie := wdata(3)
-      msstatus_fs := wdata(14, 13)
+      mstatus_sie  := wdata(1)
+      mstatus_mie  := wdata(3)
+      mstatus_mpp  := wdata(12, 11)
+      msstatus_fs  := wdata(14, 13)
+      mstatus_mprv := wdata(17)
     }
   }
+  io.mprv := mstatus_mprv
+  io.mpp  := mstatus_mpp
 
   /*
    * Number:      0x302
@@ -281,6 +287,75 @@ class CSR(implicit p: Parameters) extends CherrySpringsModule {
     rdata := mideleg
     when(wen) {
       mideleg := wdata
+    }
+  }
+
+  /*
+   * Number:      0x304 / 0x104
+   * Privilege:   MRW / SRW
+   * Name:        mie / mie
+   * Description: Machine / Supervisor interrupt-enable register
+   */
+  val mie      = WireDefault(0.U(xLen.W))
+  val sie      = WireDefault(0.U(xLen.W))
+  val mie_usie = RegInit(0.U(1.W))
+  val mie_ssie = RegInit(0.U(1.W))
+  val mie_msie = RegInit(0.U(1.W))
+  val mie_utie = RegInit(0.U(1.W))
+  val mie_stie = RegInit(0.U(1.W))
+  val mie_mtie = RegInit(0.U(1.W))
+  val mie_ueie = RegInit(0.U(1.W))
+  val mie_seie = RegInit(0.U(1.W))
+  val mie_meie = RegInit(0.U(1.W))
+  mie := Cat(
+    0.U(52.W),
+    mie_meie,
+    0.U(1.W),
+    mie_seie,
+    mie_ueie,
+    mie_mtie,
+    0.U(1.W),
+    mie_stie,
+    mie_utie,
+    mie_msie,
+    0.U(1.W),
+    mie_ssie,
+    mie_usie
+  )
+  sie := Cat(
+    0.U(54.W),
+    mie_seie,
+    mie_ueie,
+    0.U(2.W),
+    mie_stie,
+    mie_utie,
+    0.U(2.W),
+    mie_ssie,
+    mie_usie
+  )
+  when(io.rw.addr === 0x304.U) {
+    rdata := mie
+    when(wen) {
+      mie_usie := wdata(0)
+      mie_ssie := wdata(1)
+      mie_msie := wdata(3)
+      mie_utie := wdata(4)
+      mie_stie := wdata(5)
+      mie_mtie := wdata(7)
+      mie_ueie := wdata(8)
+      mie_seie := wdata(9)
+      mie_meie := wdata(11)
+    }
+  }
+  when(io.rw.addr === 0x104.U) {
+    rdata := sie
+    when(wen) {
+      mie_usie := wdata(0)
+      mie_ssie := wdata(1)
+      mie_utie := wdata(4)
+      mie_stie := wdata(5)
+      mie_ueie := wdata(8)
+      mie_seie := wdata(9)
     }
   }
 
@@ -354,6 +429,75 @@ class CSR(implicit p: Parameters) extends CherrySpringsModule {
     }
   }
 
+  /*
+   * Number:      0x344
+   * Privilege:   MRW
+   * Name:        mip
+   * Description: Machine interrupt pending
+   */
+  val mip      = WireDefault(0.U(xLen.W))
+  val sip      = WireDefault(0.U(xLen.W))
+  val mip_usip = RegInit(0.U(1.W))
+  val mip_ssip = RegInit(0.U(1.W))
+  val mip_msip = RegInit(0.U(1.W))
+  val mip_utip = RegInit(0.U(1.W))
+  val mip_stip = RegInit(0.U(1.W))
+  val mip_mtip = RegInit(0.U(1.W))
+  val mip_ueip = RegInit(0.U(1.W))
+  val mip_seip = RegInit(0.U(1.W))
+  val mip_meip = RegInit(0.U(1.W))
+  mip := Cat(
+    0.U(52.W),
+    mip_meip,
+    0.U(1.W),
+    mip_seip,
+    mip_ueip,
+    mip_mtip,
+    0.U(1.W),
+    mip_stip,
+    mip_utip,
+    mip_msip,
+    0.U(1.W),
+    mip_ssip,
+    mip_usip
+  )
+  sip := Cat(
+    0.U(54.W),
+    mip_seip,
+    mip_ueip,
+    0.U(2.W),
+    mip_stip,
+    mip_utip,
+    0.U(2.W),
+    mip_ssip,
+    mip_usip
+  )
+  when(io.rw.addr === 0x344.U) {
+    rdata := mip
+    when(wen) {
+      mip_usip := wdata(0)
+      mip_ssip := wdata(1)
+      mip_msip := wdata(3)
+      mip_utip := wdata(4)
+      mip_stip := wdata(5)
+      mip_mtip := wdata(7)
+      mip_ueip := wdata(8)
+      mip_seip := wdata(9)
+      mip_meip := wdata(11)
+    }
+  }
+  when(io.rw.addr === 0x144.U) {
+    rdata := mip
+    when(wen) {
+      mip_usip := wdata(0)
+      mip_ssip := wdata(1)
+      mip_utip := wdata(4)
+      mip_stip := wdata(5)
+      mip_ueip := wdata(8)
+      mip_seip := wdata(9)
+    }
+  }
+
   io.rw.rdata := rdata
   io.prv      := prv
 
@@ -409,6 +553,15 @@ class CSR(implicit p: Parameters) extends CherrySpringsModule {
       )
     )
   )
+  when(prv === PRV.M.U && is_exc) {
+    mepc         := io.uop.pc
+    mcause       := cause
+    mtval        := Mux(is_exc_from_lsu, io.lsu_addr, io.uop.pc)
+    mstatus_mpie := mstatus_mie
+    mstatus_mie  := 0.U
+    mstatus_mpp  := PRV.M.U
+  }
+  // todo: exception from supervisor mode
   when(prv === PRV.U.U && is_exc) {
     sepc         := io.uop.pc
     scause       := cause
@@ -453,8 +606,8 @@ class CSR(implicit p: Parameters) extends CherrySpringsModule {
     diff_cs.io.mcause         := mcause
     diff_cs.io.scause         := scause
     diff_cs.io.satp           := satp
-    diff_cs.io.mip            := 0.U
-    diff_cs.io.mie            := 0.U
+    diff_cs.io.mip            := mip
+    diff_cs.io.mie            := mie
     diff_cs.io.mscratch       := mscratch
     diff_cs.io.sscratch       := sscratch
     diff_cs.io.mideleg        := mideleg
