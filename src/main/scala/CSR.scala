@@ -538,7 +538,8 @@ class CSR(implicit p: Parameters) extends CherrySpringsModule {
   val is_exc_from_prev = (io.uop.exc =/= s"b$EXC_N".U)
   val is_exc_from_lsu  = (io.lsu_exc_code =/= 0.U)
   val is_exc           = is_exc_from_prev || is_exc_from_lsu
-  val cause = Mux(
+  val cause            = Wire(UInt(4.W))
+  cause := Mux(
     io.lsu_exc_code =/= 0.U,
     io.lsu_exc_code,
     MuxLookup(
@@ -553,24 +554,40 @@ class CSR(implicit p: Parameters) extends CherrySpringsModule {
       )
     )
   )
+  val cause_onehot = Wire(UInt(16.W))
+  cause_onehot := UIntToOH(cause)
+
+  val trap_value = Mux(is_exc_from_lsu, io.lsu_addr, Mux(io.uop.exc === s"b$EXC_EC".U, 0.U, io.uop.pc))
+
   when(prv === PRV.M.U && is_exc) {
     mepc         := io.uop.pc
     mcause       := cause
-    mtval        := Mux(is_exc_from_lsu, io.lsu_addr, io.uop.pc)
+    mtval        := trap_value
     mstatus_mpie := mstatus_mie
     mstatus_mie  := 0.U
     mstatus_mpp  := PRV.M.U
   }
   // todo: exception from supervisor mode
   when(prv === PRV.U.U && is_exc) {
-    sepc         := io.uop.pc
-    scause       := cause
-    stval        := Mux(is_exc_from_lsu, io.lsu_addr, io.uop.pc)
-    sstatus_spie := sstatus_sie
-    sstatus_sie  := 0.U
-    mstatus_spie := mstatus_sie
-    mstatus_sie  := 0.U
-    prv          := PRV.S.U
+    when((cause_onehot & medeleg) =/= 0.U) {
+      sepc         := io.uop.pc
+      scause       := cause
+      stval        := trap_value
+      sstatus_spie := sstatus_sie
+      sstatus_sie  := 0.U
+      mstatus_spie := mstatus_sie
+      mstatus_sie  := 0.U
+      mstatus_spp  := PRV.U.U
+      prv          := PRV.S.U
+    }.otherwise {
+      mepc         := io.uop.pc
+      mcause       := cause
+      mtval        := trap_value
+      mstatus_mpie := mstatus_mie
+      mstatus_mie  := 0.U
+      mstatus_mpp  := PRV.M.U
+      prv          := PRV.M.U
+    }
   }
 
   // todo: this is temporary, fix it later
@@ -619,6 +636,6 @@ class CSR(implicit p: Parameters) extends CherrySpringsModule {
     diff_ae.io.intrNO        := 0.U
     diff_ae.io.cause         := RegNext(Mux(is_exc, cause, 0.U))
     diff_ae.io.exceptionPC   := RegNext(io.uop.pc)
-    diff_ae.io.exceptionInst := 0.U
+    diff_ae.io.exceptionInst := RegNext(io.uop.instr)
   }
 }

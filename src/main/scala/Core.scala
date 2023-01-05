@@ -270,7 +270,7 @@ class Core(implicit p: Parameters) extends CherrySpringsModule {
     diff_ic.io.instr   := commit_uop.instr
     diff_ic.io.valid   := commit_uop.valid
     diff_ic.io.special := false.B
-    diff_ic.io.skip    := false.B
+    diff_ic.io.skip    := commit_uop.instr === PUTCH()
     diff_ic.io.isRVC   := false.B
     diff_ic.io.rfwen   := commit_uop.rd_wen
     diff_ic.io.fpwen   := false.B

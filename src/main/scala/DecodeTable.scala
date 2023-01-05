@@ -69,6 +69,7 @@ object DecodeTable {
     SRLW       -> Seq(Y, EXC_N,  FU_ALU, ALU_SRL,  JMP_N,    MDU_X,      LSU_N,       MEM_X,     CSR_N,  SYS_N,      RS_RF,   RS_RF,   Y, IMM_X, N),
     SRAW       -> Seq(Y, EXC_N,  FU_ALU, ALU_SRA,  JMP_N,    MDU_X,      LSU_N,       MEM_X,     CSR_N,  SYS_N,      RS_RF,   RS_RF,   Y, IMM_X, N),
     // SYS
+    ECALL      -> Seq(Y, EXC_EC, FU_SYS, ALU_ADD,  JMP_N,    MDU_X,      LSU_N,       MEM_X,     CSR_N,  SYS_N,      RS_ZERO, RS_ZERO, N, IMM_X, Y),
     FENCE      -> Seq(Y, EXC_N,  FU_SYS, ALU_ADD,  JMP_N,    MDU_X,      LSU_N,       MEM_X,     CSR_N,  SYS_FENCE,  RS_ZERO, RS_ZERO, N, IMM_X, Y),
     FENCE_I    -> Seq(Y, EXC_N,  FU_SYS, ALU_ADD,  JMP_N,    MDU_X,      LSU_N,       MEM_X,     CSR_N,  SYS_FENCEI, RS_ZERO, RS_ZERO, N, IMM_X, Y),
     SFENCE_VMA -> Seq(Y, EXC_N,  FU_SYS, ALU_ADD,  JMP_N,    MDU_X,      LSU_N,       MEM_X,     CSR_N,  SYS_SFV,    RS_ZERO, RS_ZERO, N, IMM_X, Y),
