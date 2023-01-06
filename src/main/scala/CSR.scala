@@ -549,6 +549,7 @@ class CSR(implicit p: Parameters) extends CherrySpringsModule {
         s"b$EXC_IAM".U -> 0.U,
         s"b$EXC_IAF".U -> 1.U,
         s"b$EXC_II".U  -> 2.U,
+        s"b$EXC_EB".U  -> 3.U,
         s"b$EXC_EC".U  -> Cat("b10".U, prv),
         s"b$EXC_IPF".U -> 12.U
       )
@@ -557,35 +558,55 @@ class CSR(implicit p: Parameters) extends CherrySpringsModule {
   val cause_onehot = Wire(UInt(16.W))
   cause_onehot := UIntToOH(cause)
 
-  val trap_value = Mux(is_exc_from_lsu, io.lsu_addr, Mux(io.uop.exc === s"b$EXC_EC".U, 0.U, io.uop.pc))
+  val trap_to_s  = WireDefault(false.B)
+  val trap_value = WireDefault(0.U(64.W))
+  when(is_exc_from_lsu) {
+    trap_value := io.lsu_addr
+  }
+  when(io.uop.exc === s"b$EXC_II".U) {
+    trap_value := io.uop.instr
+  }
+  when(io.uop.exc === s"b$EXC_IPF".U) {
+    trap_value := io.uop.pc
+  }
 
+  // todo: optimize this logic
   when(prv === PRV.M.U && is_exc) {
     mepc         := io.uop.pc
     mcause       := cause
     mtval        := trap_value
     mstatus_mpie := mstatus_mie
     mstatus_mie  := 0.U
-    mstatus_mpp  := PRV.M.U
+    mstatus_mpp  := prv
   }
-  // todo: exception from supervisor mode
-  when(prv === PRV.U.U && is_exc) {
+  // when(prv === PRV.S.U && is_exc) {
+  //   mepc         := io.uop.pc
+  //   mcause       := cause
+  //   mtval        := trap_value
+  //   mstatus_mpie := mstatus_mie
+  //   mstatus_mie  := 0.U
+  //   mstatus_mpp  := PRV.S.U
+  // }
+  when((prv === PRV.U.U || prv === PRV.S.U) && is_exc) {
     when((cause_onehot & medeleg) =/= 0.U) {
       sepc         := io.uop.pc
       scause       := cause
       stval        := trap_value
       sstatus_spie := sstatus_sie
       sstatus_sie  := 0.U
+      sstatus_spp  := prv
       mstatus_spie := mstatus_sie
       mstatus_sie  := 0.U
-      mstatus_spp  := PRV.U.U
+      mstatus_spp  := prv
       prv          := PRV.S.U
+      trap_to_s    := true.B
     }.otherwise {
       mepc         := io.uop.pc
       mcause       := cause
       mtval        := trap_value
       mstatus_mpie := mstatus_mie
       mstatus_mie  := 0.U
-      mstatus_mpp  := PRV.M.U
+      mstatus_mpp  := prv
       prv          := PRV.M.U
     }
   }
@@ -603,7 +624,7 @@ class CSR(implicit p: Parameters) extends CherrySpringsModule {
   io.jmp_packet.valid := is_exc || io.fence_i || satp_mode_updated || is_mret || is_sret
   io.jmp_packet.target := Mux(
     is_exc,
-    Mux(prv === PRV.U.U, stvec, mtvec),
+    Mux(trap_to_s, stvec, mtvec),
     Mux(io.fence_i || satp_mode_updated, io.uop.npc, Mux(is_mret, mepc, sepc))
   )
 

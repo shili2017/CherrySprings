@@ -14,7 +14,7 @@ object PUTCH {
 object DecodeTable {
   val decode_default: String = Seq(
     //                v  exc     fu      alu_op    jmp_op    mdu_op      lsu_op       mem_len    csr_op  sys_op      rs1/2_src   rd_wen imm_type dw64
-                      N, EXC_II, FU_X,  ALU_X,    JMP_X,    MDU_X,      LSU_X,       MEM_X,     CSR_X,  SYS_X,      RS_X,     RS_X,   N, IMM_X, Y
+                      N, EXC_II, FU_ALU, ALU_X,    JMP_X,    MDU_X,      LSU_X,       MEM_X,     CSR_X,  SYS_X,      RS_X,     RS_X,   N, IMM_X, Y
   ).reduce(_ + _)
 
   val decode_table: TruthTable = TruthTable(Map(
@@ -70,11 +70,13 @@ object DecodeTable {
     SRAW       -> Seq(Y, EXC_N,  FU_ALU, ALU_SRA,  JMP_N,    MDU_X,      LSU_N,       MEM_X,     CSR_N,  SYS_N,      RS_RF,   RS_RF,   Y, IMM_X, N),
     // SYS
     ECALL      -> Seq(Y, EXC_EC, FU_SYS, ALU_ADD,  JMP_N,    MDU_X,      LSU_N,       MEM_X,     CSR_N,  SYS_N,      RS_ZERO, RS_ZERO, N, IMM_X, Y),
+    EBREAK     -> Seq(Y, EXC_EB, FU_SYS, ALU_ADD,  JMP_N,    MDU_X,      LSU_N,       MEM_X,     CSR_N,  SYS_N,      RS_ZERO, RS_ZERO, N, IMM_X, Y),
     FENCE      -> Seq(Y, EXC_N,  FU_SYS, ALU_ADD,  JMP_N,    MDU_X,      LSU_N,       MEM_X,     CSR_N,  SYS_FENCE,  RS_ZERO, RS_ZERO, N, IMM_X, Y),
     FENCE_I    -> Seq(Y, EXC_N,  FU_SYS, ALU_ADD,  JMP_N,    MDU_X,      LSU_N,       MEM_X,     CSR_N,  SYS_FENCEI, RS_ZERO, RS_ZERO, N, IMM_X, Y),
     SFENCE_VMA -> Seq(Y, EXC_N,  FU_SYS, ALU_ADD,  JMP_N,    MDU_X,      LSU_N,       MEM_X,     CSR_N,  SYS_SFV,    RS_ZERO, RS_ZERO, N, IMM_X, Y),
     MRET       -> Seq(Y, EXC_N,  FU_SYS, ALU_ADD,  JMP_N,    MDU_X,      LSU_N,       MEM_X,     CSR_N,  SYS_MRET,   RS_ZERO, RS_ZERO, N, IMM_X, Y),
     SRET       -> Seq(Y, EXC_N,  FU_SYS, ALU_ADD,  JMP_N,    MDU_X,      LSU_N,       MEM_X,     CSR_N,  SYS_SRET,   RS_ZERO, RS_ZERO, N, IMM_X, Y),
+    WFI        -> Seq(Y, EXC_N,  FU_ALU, ALU_ADD,  JMP_N,    MDU_X,      LSU_N,       MEM_X,     CSR_N,  SYS_N,      RS_ZERO, RS_ZERO, N, IMM_X, Y),
     // CSR
     CSRRW      -> Seq(Y, EXC_N,  FU_CSR, ALU_X,    JMP_N,    MDU_X,      LSU_N,       MEM_X,     CSR_RW, SYS_N,      RS_RF,   RS_X,    Y, IMM_X, Y),
     CSRRS      -> Seq(Y, EXC_N,  FU_CSR, ALU_X,    JMP_N,    MDU_X,      LSU_N,       MEM_X,     CSR_RS, SYS_N,      RS_RF,   RS_X,    Y, IMM_X, Y),

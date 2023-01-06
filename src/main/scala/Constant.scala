@@ -14,6 +14,7 @@ trait Constant {
   val EXC_IPF = "011" // Instruction page fault (12)
   val EXC_II  = "100" // Illegal instruction (2)
   val EXC_EC  = "101" // Environment call from U/S/M-mode (8, 9, 11)
+  val EXC_EB  = "111" // Breakpoint (3)
 
   val FU_X   = "???"
   val FU_ALU = "000"
